@@ -28,6 +28,10 @@ class ProductsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMap
             });
         }
 
+        if (! empty($this->filters['product_type'])) {
+            $query->where('product_type', $this->filters['product_type']);
+        }
+
         if (! empty($this->filters['category'])) {
             $query->where('category_id', $this->filters['category']);
         }
@@ -48,6 +52,8 @@ class ProductsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMap
         return [
             'SKU',
             'Product Name',
+            'Type',
+            'Sales Unit',
             'Category',
             'Brand',
             'Retail Price ($)',
@@ -70,6 +76,8 @@ class ProductsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMap
         return [
             $row->sku,
             $row->name,
+            ucwords(str_replace('_', ' ', $row->product_type ?? 'standard')),
+            $row->unit ?? 'piece',
             $row->category?->name ?? 'Uncategorized',
             $row->brand?->name ?? 'None',
             number_format($row->price, 2, '.', ''),

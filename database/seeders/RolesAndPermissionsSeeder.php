@@ -46,6 +46,26 @@ class RolesAndPermissionsSeeder extends Seeder
             'settings.view',
             'settings.edit',
 
+            // Inventory
+            'inventory.view',
+            'inventory.adjust',
+
+            // Banners & Sliders
+            'banners.view',
+            'banners.manage',
+
+            // Promotions & Flash Sales
+            'promotions.view',
+            'promotions.manage',
+
+            // Coupons & Promo Codes
+            'coupons.view',
+            'coupons.manage',
+
+            // Customer Reviews & Ratings
+            'reviews.view',
+            'reviews.manage',
+
             // Staff & Roles
             'staff.view',
             'staff.manage',
@@ -63,6 +83,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $manager = Role::firstOrCreate(['name' => 'Store Manager', 'guard_name' => 'web']);
         $manager->syncPermissions([
             'products.view', 'products.create', 'products.edit', 'products.delete',
+            'inventory.view', 'inventory.adjust',
+            'banners.view', 'banners.manage',
+            'promotions.view', 'promotions.manage',
+            'coupons.view', 'coupons.manage',
+            'reviews.view', 'reviews.manage',
             'orders.view', 'orders.edit', 'orders.update_status', 'orders.invoice',
             'categories.view', 'categories.create', 'categories.edit', 'categories.delete',
             'customers.view', 'customers.edit',
@@ -74,6 +99,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $fulfillment->syncPermissions([
             'orders.view', 'orders.edit', 'orders.update_status', 'orders.invoice',
             'products.view',
+            'inventory.view', 'inventory.adjust',
             'customers.view',
         ]);
 

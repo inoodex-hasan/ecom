@@ -34,7 +34,7 @@ class DashboardController extends Controller
         $recentOrders = Order::with('customer')
             ->withCount('items')
             ->latest()
-            ->take(6)
+            ->take(5)
             ->get();
 
         // Low stock products

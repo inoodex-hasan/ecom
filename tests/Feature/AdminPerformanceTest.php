@@ -94,14 +94,16 @@ class AdminPerformanceTest extends TestCase
             'email' => 'jane@example.com',
         ]);
 
-        Order::create([
-            'order_number' => 'ORD-201',
-            'customer_id' => $customer->id,
-            'status' => 'delivered',
-            'payment_status' => 'paid',
-            'total' => 150.00,
-            'created_at' => now(),
-        ]);
+        foreach (range(1, 7) as $i) {
+            Order::create([
+                'order_number' => "ORD-20{$i}",
+                'customer_id' => $customer->id,
+                'status' => 'delivered',
+                'payment_status' => 'paid',
+                'total' => 100.00 + $i,
+                'created_at' => now()->subMinutes(10 - $i),
+            ]);
+        }
 
         $response = $this->actingAs($this->admin)->get('/admin/dashboard');
         $response->assertOk();
@@ -109,10 +111,11 @@ class AdminPerformanceTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('Admin/Dashboard')
             ->has('metrics')
+            ->has('recentOrders', 5)
             ->has('salesChart.categories', 12)
             ->has('salesChart.revenue', 12)
             ->has('statusDistribution')
-            ->where('statusDistribution.delivered', 1)
+            ->where('statusDistribution.delivered', 7)
             ->where('statusDistribution.pending', 0)
         );
     }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watchEffect } from 'vue';
+import { ref, onMounted, computed, watch, watchEffect } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import {
     LayoutDashboard,
@@ -18,7 +18,12 @@ import {
     Store,
     CheckCircle2,
     AlertCircle,
-    ShieldCheck
+    ShieldCheck,
+    Boxes,
+    Image,
+    Zap,
+    Ticket,
+    Star
 } from 'lucide-vue-next';
 
 const page = usePage();
@@ -26,6 +31,41 @@ const isSidebarOpen = ref(true);
 const isMobileMenuOpen = ref(false);
 const isUserDropdownOpen = ref(false);
 const isDarkMode = ref(false);
+
+// Toast notification state with auto-fade after 3 seconds
+const showFlash = ref(false);
+const flashMessage = ref('');
+const flashType = ref('success');
+let flashTimer = null;
+
+function triggerFlash(message, type = 'success') {
+    if (!message) return;
+    if (flashTimer) clearTimeout(flashTimer);
+    flashMessage.value = message;
+    flashType.value = type;
+    showFlash.value = true;
+
+    flashTimer = setTimeout(() => {
+        showFlash.value = false;
+    }, 3000);
+}
+
+function closeFlash() {
+    if (flashTimer) clearTimeout(flashTimer);
+    showFlash.value = false;
+}
+
+watch(
+    () => page.props.flash,
+    (newFlash) => {
+        if (newFlash?.success) {
+            triggerFlash(newFlash.success, 'success');
+        } else if (newFlash?.error) {
+            triggerFlash(newFlash.error, 'error');
+        }
+    },
+    { deep: true, immediate: true }
+);
 
 const storeName = computed(() => page.props.site_settings?.store_name || 'ApexStore');
 const storeLogo = computed(() => page.props.site_settings?.store_logo || null);
@@ -46,8 +86,13 @@ watchEffect(() => {
 const allNavItems = [
     { name: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard },
     { name: 'Products', route: 'admin.products.index', icon: ShoppingBag, permission: 'products.view' },
+    { name: 'Inventory', route: 'admin.inventory.index', icon: Boxes, permission: 'inventory.view' },
     { name: 'Orders', route: 'admin.orders.index', icon: ShoppingCart, permission: 'orders.view' },
     { name: 'Categories', route: 'admin.categories.index', icon: FolderTree, permission: 'categories.view' },
+    { name: 'Banners', route: 'admin.banners.index', icon: Image, permission: 'banners.view' },
+    { name: 'Flash Sales', route: 'admin.flash-sales.index', icon: Zap, permission: 'promotions.view' },
+    { name: 'Coupons', route: 'admin.coupons.index', icon: Ticket, permission: 'coupons.view' },
+    { name: 'Reviews', route: 'admin.reviews.index', icon: Star, permission: 'reviews.view' },
     { name: 'Customers', route: 'admin.customers.index', icon: Users, permission: 'customers.view' },
     { name: 'Staff & Roles', route: 'admin.staff.index', icon: ShieldCheck, permission: 'staff.view' },
     { name: 'Settings', route: 'admin.settings.index', icon: Settings, permission: 'settings.view' },
@@ -94,46 +139,63 @@ function logout() {
 
 <template>
     <div class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
-        <!-- Toast Notification from flash session -->
-        <div
-            v-if="page.props.flash?.success || page.props.flash?.error"
-            class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium transition-all duration-300"
-            :class="page.props.flash?.success ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'"
+        <!-- Toast Notification from flash session (Auto-fades after 3s) -->
+        <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 translate-y-4 sm:translate-y-0 sm:translate-x-4 scale-95"
+            enter-to-class="opacity-100 translate-y-0 sm:translate-x-0 scale-100"
+            leave-active-class="transition-all duration-300 ease-in"
+            leave-from-class="opacity-100 translate-y-0 sm:translate-x-0 scale-100"
+            leave-to-class="opacity-0 translate-y-4 sm:translate-y-0 sm:translate-x-4 scale-95"
         >
-            <CheckCircle2 v-if="page.props.flash?.success" class="w-5 h-5" />
-            <AlertCircle v-else class="w-5 h-5" />
-            <span>{{ page.props.flash?.success || page.props.flash?.error }}</span>
-        </div>
+            <div
+                v-if="showFlash && flashMessage"
+                class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium text-white backdrop-blur-md transition-all duration-300 border border-white/10"
+                :class="flashType === 'success' ? 'bg-emerald-600/95 shadow-emerald-600/20' : 'bg-rose-600/95 shadow-rose-600/20'"
+            >
+                <CheckCircle2 v-if="flashType === 'success'" class="w-5 h-5 shrink-0" />
+                <AlertCircle v-else class="w-5 h-5 shrink-0" />
+                <span class="pr-1">{{ flashMessage }}</span>
+                <button
+                    @click="closeFlash"
+                    type="button"
+                    class="p-1 rounded-lg hover:bg-white/20 transition-colors ml-1 -mr-1 text-white/80 hover:text-white"
+                    aria-label="Close notification"
+                >
+                    <X class="w-4 h-4" />
+                </button>
+            </div>
+        </Transition>
 
         <div class="flex flex-1 overflow-hidden">
             <!-- Sidebar Desktop -->
             <aside
                 :class="[
-                    isSidebarOpen ? 'w-64' : 'w-20',
+                    isSidebarOpen ? 'w-52' : 'w-18',
                     'hidden lg:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 z-30'
                 ]"
             >
                 <!-- Brand / Logo Header -->
                 <div
-                    class="h-16 flex items-center border-b border-slate-200 dark:border-slate-800 transition-all px-4"
+                    class="h-16 flex items-center border-b border-slate-200 dark:border-slate-800 transition-all px-3.5"
                     :class="isSidebarOpen ? 'justify-start' : 'justify-center'"
                 >
-                    <Link :href="route('admin.dashboard')" class="flex items-center gap-3 overflow-hidden">
-                        <div v-if="storeLogo" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center border border-slate-200 dark:border-slate-700 shrink-0 overflow-hidden">
+                    <Link :href="route('admin.dashboard')" class="flex items-center gap-2.5 overflow-hidden">
+                        <div v-if="storeLogo" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center border border-slate-200 dark:border-slate-700 shrink-0 overflow-hidden">
                             <img :src="storeLogo" :alt="storeName" class="max-w-full max-h-full object-contain" />
                         </div>
-                        <div v-else class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-500/20 shrink-0">
-                            <Store class="w-5 h-5" />
+                        <div v-else class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-500/20 shrink-0">
+                            <Store class="w-4 h-4" />
                         </div>
                         <div v-if="isSidebarOpen" class="flex flex-col min-w-0">
-                            <span class="font-bold text-slate-900 dark:text-white text-base tracking-tight leading-none truncate">{{ storeName }}</span>
-                            <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase mt-1">Admin Hub</span>
+                            <span class="font-bold text-slate-900 dark:text-white text-sm tracking-tight leading-none truncate">{{ storeName }}</span>
+                            <span class="text-[9px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase mt-1">Admin Hub</span>
                         </div>
                     </Link>
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
+                <div class="flex-1 py-5 px-2.5 space-y-1 overflow-y-auto">
                     <Link
                         v-for="item in navItems"
                         :key="item.name"
@@ -142,8 +204,8 @@ function logout() {
                             route().current(item.route + '*')
                                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100',
-                            isSidebarOpen ? 'px-3.5' : 'justify-center px-0',
-                            'flex items-center gap-3 py-2.5 rounded-xl text-sm transition-all duration-150 group'
+                            isSidebarOpen ? 'px-3' : 'justify-center px-0',
+                            'flex items-center gap-2.5 py-2.5 rounded-xl text-sm transition-all duration-150 group'
                         ]"
                         :title="!isSidebarOpen ? item.name : ''"
                     >
@@ -158,31 +220,6 @@ function logout() {
                         />
                         <span v-if="isSidebarOpen" class="truncate">{{ item.name }}</span>
                     </Link>
-                </div>
-
-                <!-- User Profile Card in Sidebar Bottom -->
-                <div class="p-3 border-t border-slate-200 dark:border-slate-800">
-                    <div
-                        v-if="page.props.auth?.user"
-                        :class="[
-                            isSidebarOpen ? 'p-2' : 'p-1.5 justify-center',
-                            'flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 transition-all'
-                        ]"
-                    >
-                        <img
-                            :src="page.props.auth.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.props.auth.user.name)}&background=6366f1&color=fff`"
-                            alt="Avatar"
-                            class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-indigo-500/20"
-                        />
-                        <div v-if="isSidebarOpen" class="flex-1 min-w-0">
-                            <p class="text-xs font-semibold text-slate-900 dark:text-white truncate">
-                                {{ page.props.auth.user.name }}
-                            </p>
-                            <span class="inline-block text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                {{ page.props.auth.user.role || 'Admin' }}
-                            </span>
-                        </div>
-                    </div>
                 </div>
             </aside>
 
