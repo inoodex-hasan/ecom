@@ -3,9 +3,11 @@
 use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CouponController;
+use App\Http\Controllers\Admin\CourierController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FlashSaleController;
+use App\Http\Controllers\Admin\FraudController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
@@ -62,6 +64,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status')->middleware('can:orders.update_status');
     Route::patch('/orders/{order}/payment-status', [OrderController::class, 'updatePaymentStatus'])->name('orders.update-payment-status')->middleware('can:orders.edit');
     Route::get('/orders/{order}/invoice', [OrderController::class, 'invoice'])->name('orders.invoice')->middleware('can:orders.invoice');
+    Route::post('/orders/{order}/courier-dispatch', [CourierController::class, 'dispatchOrder'])->name('orders.courier-dispatch')->middleware('can:orders.edit');
+    Route::post('/orders/{order}/courier-sync', [CourierController::class, 'syncStatus'])->name('orders.courier-sync')->middleware('can:orders.edit');
+    Route::get('/orders/{order}/courier-label', [CourierController::class, 'printLabel'])->name('orders.courier-label')->middleware('can:orders.view');
 
     // Categories Management
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index')->middleware('can:categories.view');
@@ -117,6 +122,18 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy')->middleware('can:staff.manage');
     Route::post('/roles/{role}/permissions', [StaffController::class, 'updateRolePermissions'])->name('roles.update-permissions')->middleware('can:staff.manage');
     Route::post('/roles/bulk-permissions', [StaffController::class, 'bulkUpdateRolePermissions'])->name('roles.bulk-update')->middleware('can:staff.manage');
+
+    // Fraud Detection & Risk Shield (Bangladeshi E-commerce)
+    Route::get('/fraud', [FraudController::class, 'index'])->name('fraud.index')->middleware('can:fraud.view');
+    Route::post('/fraud/lookup', [FraudController::class, 'lookup'])->name('fraud.lookup')->middleware('can:fraud.view');
+    Route::post('/fraud/orders/{order}/recheck', [FraudController::class, 'recheck'])->name('fraud.recheck')->middleware('can:fraud.manage');
+    Route::post('/fraud/orders/{order}/verify', [FraudController::class, 'verify'])->name('fraud.verify')->middleware('can:fraud.manage');
+    Route::post('/fraud/orders/{order}/request-advance', [FraudController::class, 'requestAdvance'])->name('fraud.request-advance')->middleware('can:fraud.manage');
+    Route::post('/fraud/orders/{order}/confirm-advance', [FraudController::class, 'confirmAdvance'])->name('fraud.confirm-advance')->middleware('can:fraud.manage');
+    Route::post('/fraud/orders/{order}/block', [FraudController::class, 'blockOrder'])->name('fraud.block')->middleware('can:fraud.manage');
+    Route::post('/fraud/blacklist', [FraudController::class, 'storeBlacklist'])->name('fraud.blacklist.store')->middleware('can:fraud.manage');
+    Route::delete('/fraud/blacklist/{blacklist}', [FraudController::class, 'destroyBlacklist'])->name('fraud.blacklist.destroy')->middleware('can:fraud.manage');
+    Route::post('/fraud/settings', [FraudController::class, 'updateSettings'])->name('fraud.settings.update')->middleware('can:fraud.manage');
 
     // Settings
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index')->middleware('can:settings.view');

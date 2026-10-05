@@ -54,6 +54,8 @@ php_error.log
 
 # IDE & OS Specific Files
 .agents/
+.codegraph/
+.codegraph-*/
 .idea/
 .vscode/
 .fleet/

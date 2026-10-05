@@ -69,6 +69,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // Staff & Roles
             'staff.view',
             'staff.manage',
+
+            // Fraud Shield & Risk Control
+            'fraud.view',
+            'fraud.manage',
         ];
 
         foreach ($permissions as $permission) {
@@ -92,6 +96,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'categories.view', 'categories.create', 'categories.edit', 'categories.delete',
             'customers.view', 'customers.edit',
             'settings.view',
+            'fraud.view', 'fraud.manage',
         ]);
 
         // 3. Fulfillment Staff Role
@@ -101,6 +106,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.view',
             'inventory.view', 'inventory.adjust',
             'customers.view',
+            'fraud.view',
         ]);
 
         // 4. Catalog Specialist Role

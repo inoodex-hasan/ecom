@@ -29,6 +29,23 @@ class Order extends Model
         'paid_at',
         'shipped_at',
         'delivered_at',
+        'fraud_score',
+        'fraud_risk_level',
+        'fraud_status',
+        'fraud_flags',
+        'advance_delivery_charge',
+        'advance_payment_method',
+        'advance_transaction_id',
+        'advance_payment_status',
+        'fraud_checked_at',
+        'fraud_notes',
+        'courier_provider',
+        'courier_consignment_id',
+        'courier_tracking_code',
+        'courier_status',
+        'courier_cod_amount',
+        'courier_dispatched_at',
+        'courier_payload',
     ];
 
     protected $casts = [
@@ -42,6 +59,13 @@ class Order extends Model
         'paid_at' => 'datetime',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'fraud_score' => 'integer',
+        'fraud_flags' => 'array',
+        'advance_delivery_charge' => 'float',
+        'fraud_checked_at' => 'datetime',
+        'courier_cod_amount' => 'float',
+        'courier_dispatched_at' => 'datetime',
+        'courier_payload' => 'array',
     ];
 
     protected static function booted(): void

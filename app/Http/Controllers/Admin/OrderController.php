@@ -48,6 +48,10 @@ class OrderController extends Controller
             $query->where('payment_status', $request->input('payment_status'));
         }
 
+        if ($request->filled('fraud_risk')) {
+            $query->where('fraud_risk_level', $request->input('fraud_risk'));
+        }
+
         $orders = $query->latest()->paginate(10)->withQueryString();
 
         $rawCounts = Order::toBase()
@@ -67,7 +71,7 @@ class OrderController extends Controller
         return Inertia::render('Admin/Orders/Index', [
             'orders' => $orders,
             'statusCounts' => $statusCounts,
-            'filters' => $request->only(['search', 'status', 'payment_status']),
+            'filters' => $request->only(['search', 'status', 'payment_status', 'fraud_risk']),
         ]);
     }
 

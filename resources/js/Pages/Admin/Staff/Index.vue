@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Head, useForm, router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import {
@@ -35,7 +35,15 @@ import {
     Info,
     Minus,
     CheckCheck,
-    Eye
+    Eye,
+    Boxes,
+    Image as ImageIcon,
+    Zap,
+    Ticket,
+    Star,
+    LayoutGrid,
+    Sliders,
+    ArrowRight
 } from 'lucide-vue-next';
 import CustomSelect from '@/Components/CustomSelect.vue';
 
@@ -55,11 +63,67 @@ const matrixState = ref(
     props.roles.map(role => ({
         role_id: role.id,
         role_name: role.name,
-        permissions: role.permissions?.map(p => p.name) || [],
+        permissions: [...(role.permissions?.map(p => p.name) || [])],
     }))
 );
 
-const isMatrixDirty = ref(false);
+watch(
+    () => props.roles,
+    (newRoles) => {
+        matrixState.value = newRoles.map(role => ({
+            role_id: role.id,
+            role_name: role.name,
+            permissions: [...(role.permissions?.map(p => p.name) || [])],
+        }));
+    },
+    { deep: true }
+);
+
+// View Mode: 'table' (Comparison Grid) | 'role' (Role Inspector)
+const matrixViewMode = ref('table');
+const selectedFocusRoleId = ref(
+    props.roles.find(r => r.name !== 'Super Admin')?.id || props.roles[0]?.id
+);
+
+const selectedFocusRole = computed(() => {
+    return props.roles.find(r => r.id === selectedFocusRoleId.value) || props.roles[0];
+});
+
+// Matrix changes calculation
+const matrixChangesCount = computed(() => {
+    let diff = 0;
+    for (const role of props.roles) {
+        if (role.name === 'Super Admin') continue;
+        const initialPerms = new Set(role.permissions?.map(p => p.name) || []);
+        const currentEntry = matrixState.value.find(r => r.role_id === role.id);
+        const currentPerms = new Set(currentEntry?.permissions || []);
+
+        for (const p of currentPerms) {
+            if (!initialPerms.has(p)) diff++;
+        }
+        for (const p of initialPerms) {
+            if (!currentPerms.has(p)) diff++;
+        }
+    }
+    return diff;
+});
+
+const modifiedRolesCount = computed(() => {
+    let count = 0;
+    for (const role of props.roles) {
+        if (role.name === 'Super Admin') continue;
+        const initialPerms = new Set(role.permissions?.map(p => p.name) || []);
+        const currentEntry = matrixState.value.find(r => r.role_id === role.id);
+        const currentPerms = new Set(currentEntry?.permissions || []);
+        if (initialPerms.size !== currentPerms.size || [...initialPerms].some(p => !currentPerms.has(p))) {
+            count++;
+        }
+    }
+    return count;
+});
+
+const isMatrixDirty = computed(() => matrixChangesCount.value > 0);
+
 const matrixForm = useForm({
     matrix: [],
 });
@@ -104,7 +168,6 @@ function toggleMatrixPermission(roleId, permName) {
     } else {
         roleEntry.permissions.push(permName);
     }
-    isMatrixDirty.value = true;
 }
 
 function toggleAllForRole(roleId) {
@@ -119,16 +182,29 @@ function toggleAllForRole(roleId) {
     } else {
         roleEntry.permissions = [...allPermNames];
     }
-    isMatrixDirty.value = true;
+}
+
+function grantAllForRole(roleId) {
+    const roleEntry = matrixState.value.find(r => r.role_id === roleId);
+    if (!roleEntry || roleEntry.role_name === 'Super Admin') return;
+
+    const allPermNames = Object.values(props.groupedPermissions).flatMap(group => group.map(p => p.name));
+    roleEntry.permissions = [...allPermNames];
+}
+
+function revokeAllForRole(roleId) {
+    const roleEntry = matrixState.value.find(r => r.role_id === roleId);
+    if (!roleEntry || roleEntry.role_name === 'Super Admin') return;
+
+    roleEntry.permissions = [];
 }
 
 function resetMatrix() {
     matrixState.value = props.roles.map(role => ({
         role_id: role.id,
         role_name: role.name,
-        permissions: role.permissions?.map(p => p.name) || [],
+        permissions: [...(role.permissions?.map(p => p.name) || [])],
     }));
-    isMatrixDirty.value = false;
 }
 
 function saveMatrix() {
@@ -140,7 +216,7 @@ function saveMatrix() {
     matrixForm.post(route('admin.roles.bulk-update'), {
         preserveScroll: true,
         onSuccess: () => {
-            isMatrixDirty.value = false;
+            // Inertia will refresh props.roles and trigger watcher
         },
     });
 }
@@ -175,6 +251,7 @@ function getRoleBadge(roleName) {
                 avatarBg: 'from-emerald-600 to-teal-600',
                 barBg: 'bg-emerald-500',
             };
+        case 'Customer Support':
         default:
             return {
                 bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
@@ -185,11 +262,29 @@ function getRoleBadge(roleName) {
     }
 }
 
+function getRoleDescription(roleName) {
+    switch (roleName) {
+        case 'Super Admin':
+            return 'Full unrestricted administrative privileges and immutable system control across all operational modules.';
+        case 'Store Manager':
+            return 'Broad store administration including inventory, catalog, promotions, orders, and customer management.';
+        case 'Fulfillment Staff':
+            return 'Order processing, packing, shipping statuses, dispatch invoices, and warehouse stock levels.';
+        case 'Catalog Specialist':
+            return 'Product catalog publishing, SKU listings, taxonomy organization, and category trees.';
+        case 'Customer Support':
+            return 'Frontline customer query resolution, order lookups, customer account profiles, and reviews.';
+        default:
+            return 'Custom defined administrative role with tailored operational capabilities.';
+    }
+}
+
 // Matrix search and filtering state
 const matrixSearch = ref('');
 const selectedModuleFilter = ref('all');
 
 const permissionMeta = {
+    // Products
     'products.view': {
         title: 'View Products',
         description: 'Browse catalog items, stock levels, variants, and pricing structures',
@@ -210,6 +305,20 @@ const permissionMeta = {
         description: 'Permanently remove or archive products from the storefront catalog',
         type: 'danger',
     },
+
+    // Inventory
+    'inventory.view': {
+        title: 'View Inventory',
+        description: 'Inspect real-time stock balances, warehouse tracking, and low-stock alerts',
+        type: 'read',
+    },
+    'inventory.adjust': {
+        title: 'Adjust Stock Levels',
+        description: 'Perform manual stock adjustments, restock audits, and warehouse allocations',
+        type: 'write',
+    },
+
+    // Orders
     'orders.view': {
         title: 'View Orders',
         description: 'Access customer orders, billing summaries, and order tracking streams',
@@ -230,6 +339,8 @@ const permissionMeta = {
         description: 'Generate, download, and print official customer tax invoices and receipts',
         type: 'read',
     },
+
+    // Categories
     'categories.view': {
         title: 'View Categories',
         description: 'Explore product taxonomy, category trees, and featured collections',
@@ -250,6 +361,56 @@ const permissionMeta = {
         description: 'Remove catalog categories and detach associated product taxonomy',
         type: 'danger',
     },
+
+    // Banners & Sliders
+    'banners.view': {
+        title: 'View Banners',
+        description: 'View storefront hero carousels, promotional sliders, and banner impressions',
+        type: 'read',
+    },
+    'banners.manage': {
+        title: 'Manage Banners',
+        description: 'Upload banner graphics, schedule flight dates, set CTA targets, and reorder',
+        type: 'write',
+    },
+
+    // Promotions & Flash Sales
+    'promotions.view': {
+        title: 'View Promotions',
+        description: 'Monitor active flash sales, countdown deals, and time-limited promotions',
+        type: 'read',
+    },
+    'promotions.manage': {
+        title: 'Manage Promotions',
+        description: 'Create flash sale events, set countdown timers, and assign discount items',
+        type: 'write',
+    },
+
+    // Coupons & Promo Codes
+    'coupons.view': {
+        title: 'View Coupons',
+        description: 'Review promo code records, discount metrics, redemption counts, and caps',
+        type: 'read',
+    },
+    'coupons.manage': {
+        title: 'Manage Coupons',
+        description: 'Create discount codes, configure percentage/fixed discounts, and usage limits',
+        type: 'write',
+    },
+
+    // Customer Reviews & Ratings
+    'reviews.view': {
+        title: 'View Reviews',
+        description: 'Browse customer ratings, review feedback, submitted photos, and verified badges',
+        type: 'read',
+    },
+    'reviews.manage': {
+        title: 'Moderate Reviews',
+        description: 'Approve, feature, unpublish, reject spam reviews, and reply to customers',
+        type: 'write',
+    },
+
+    // Customers
     'customers.view': {
         title: 'View Customers',
         description: 'Inspect registered customer profiles, lifetime metrics, and purchase activity',
@@ -260,16 +421,8 @@ const permissionMeta = {
         description: 'Update customer profiles, account statuses, and shipping addresses',
         type: 'write',
     },
-    'settings.view': {
-        title: 'View Settings',
-        description: 'Inspect store configuration parameters, shipping rules, and payment gateways',
-        type: 'admin',
-    },
-    'settings.edit': {
-        title: 'Edit Settings',
-        description: 'Configure store profile, currency, payment providers, and system parameters',
-        type: 'admin',
-    },
+
+    // Staff & Security
     'staff.view': {
         title: 'View Staff Directory',
         description: 'Inspect administrative team members and their assigned security roles',
@@ -280,13 +433,42 @@ const permissionMeta = {
         description: 'Invite administrators, allocate security roles, and modify capability matrices',
         type: 'admin',
     },
+
+    // Fraud Shield & Risk Control
+    'fraud.view': {
+        title: 'View Fraud Shield',
+        description: 'Inspect order risk assessments, delivery courier scores, and flagged queues',
+        type: 'read',
+    },
+    'fraud.manage': {
+        title: 'Manage Fraud & Blacklist',
+        description: 'Manage phone blacklist/whitelist, request advance fees, and block fraudulent orders',
+        type: 'admin',
+    },
+
+    // System Settings
+    'settings.view': {
+        title: 'View Settings',
+        description: 'Inspect store configuration parameters, shipping rules, and payment gateways',
+        type: 'admin',
+    },
+    'settings.edit': {
+        title: 'Edit Settings',
+        description: 'Configure store profile, currency, payment providers, and system parameters',
+        type: 'admin',
+    },
 };
 
 const moduleMeta = {
     products: {
-        title: 'Products & Inventory',
+        title: 'Products & Catalog',
         description: 'SKU management, catalog listings, variant options, and stock control',
         icon: Package,
+    },
+    inventory: {
+        title: 'Inventory & Warehousing',
+        description: 'Real-time stock tracking, stock adjustments, and low-inventory alerts',
+        icon: Boxes,
     },
     orders: {
         title: 'Orders & Fulfillment',
@@ -298,20 +480,45 @@ const moduleMeta = {
         description: 'Store navigation, category hierarchies, and product classifications',
         icon: FolderTree,
     },
+    banners: {
+        title: 'Banners & Sliders',
+        description: 'Homepage hero banners, promotional sliders, and CTA link destinations',
+        icon: ImageIcon,
+    },
+    promotions: {
+        title: 'Promotions & Flash Sales',
+        description: 'Time-limited flash deals, countdown sales, and promotional pricing events',
+        icon: Zap,
+    },
+    coupons: {
+        title: 'Coupons & Promo Codes',
+        description: 'Promotional discount codes, usage quotas, minimum spend caps, and expiry dates',
+        icon: Ticket,
+    },
+    reviews: {
+        title: 'Customer Reviews & Ratings',
+        description: 'Customer ratings, photo testimonials, moderation, and feedback replies',
+        icon: Star,
+    },
     customers: {
         title: 'Customer Directory',
         description: 'Customer accounts, purchase histories, and contact profiles',
         icon: Users,
     },
-    settings: {
-        title: 'System Settings',
-        description: 'Global business parameters, payment gateways, and shipping options',
-        icon: Settings,
+    fraud: {
+        title: 'Fraud Shield & Risk Control',
+        description: 'Bangladeshi phone validation, COD high-risk checks, courier RTO history, and blacklist registry',
+        icon: ShieldAlert,
     },
     staff: {
         title: 'Staff & Security',
         description: 'Administrative access control, role assignments, and capability policies',
         icon: ShieldCheck,
+    },
+    settings: {
+        title: 'System Settings',
+        description: 'Global business parameters, payment gateways, and shipping options',
+        icon: Settings,
     },
 };
 
@@ -376,23 +583,6 @@ function getRolePermissionPercentage(roleId) {
     return Math.round((getRolePermissionCount(roleId) / totalPermissionsCount.value) * 100);
 }
 
-function grantAllForRole(roleId) {
-    const roleEntry = matrixState.value.find(r => r.role_id === roleId);
-    if (!roleEntry || roleEntry.role_name === 'Super Admin') return;
-
-    const allPermNames = Object.values(props.groupedPermissions).flatMap(group => group.map(p => p.name));
-    roleEntry.permissions = [...allPermNames];
-    isMatrixDirty.value = true;
-}
-
-function revokeAllForRole(roleId) {
-    const roleEntry = matrixState.value.find(r => r.role_id === roleId);
-    if (!roleEntry || roleEntry.role_name === 'Super Admin') return;
-
-    roleEntry.permissions = [];
-    isMatrixDirty.value = true;
-}
-
 function isModuleAllActive(moduleName, roleId) {
     const roleEntry = matrixState.value.find(r => r.role_id === roleId);
     if (!roleEntry) return false;
@@ -412,6 +602,16 @@ function isModulePartiallyActive(moduleName, roleId) {
     return activeCount > 0 && activeCount < modulePerms.length;
 }
 
+function getModuleActiveCount(moduleName, roleId) {
+    const roleEntry = matrixState.value.find(r => r.role_id === roleId);
+    if (!roleEntry) return 0;
+    if (roleEntry.role_name === 'Super Admin') {
+        return (props.groupedPermissions[moduleName] || []).length;
+    }
+    const modulePerms = props.groupedPermissions[moduleName] || [];
+    return modulePerms.filter(p => roleEntry.permissions.includes(p.name)).length;
+}
+
 function toggleModuleForRole(moduleName, roleId) {
     const roleEntry = matrixState.value.find(r => r.role_id === roleId);
     if (!roleEntry || roleEntry.role_name === 'Super Admin') return;
@@ -426,7 +626,6 @@ function toggleModuleForRole(moduleName, roleId) {
         const newPerms = new Set([...roleEntry.permissions, ...modulePermNames]);
         roleEntry.permissions = Array.from(newPerms);
     }
-    isMatrixDirty.value = true;
 }
 
 const filteredGroupedPermissions = computed(() => {
@@ -463,20 +662,7 @@ const filteredPermissionsCount = computed(() => {
 });
 
 function getModuleIcon(module) {
-    switch (module) {
-        case 'products':
-            return Package;
-        case 'orders':
-            return ShoppingCart;
-        case 'categories':
-            return FolderTree;
-        case 'customers':
-            return Users;
-        case 'settings':
-            return Settings;
-        default:
-            return ShieldCheck;
-    }
+    return moduleMeta[module]?.icon || ShieldCheck;
 }
 
 const formatDate = (dateStr) => {
@@ -683,90 +869,122 @@ const formatDate = (dateStr) => {
                 </div>
             </div>
 
-            <!-- TAB 2: RICH ROLES & PERMISSIONS MATRIX GRID -->
+            <!-- TAB 2: RICH ROLES & PERMISSIONS CAPABILITY MATRIX -->
             <div v-if="activeTab === 'matrix'" class="space-y-6">
                 <!-- 1. Top Role Overview Cards Deck -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                    <div
-                        v-for="role in roles"
-                        :key="role.id"
-                        class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 shadow-xs flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all"
-                    >
-                        <!-- Top: Avatar & Name -->
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="flex items-center gap-2.5">
-                                <div :class="['w-9 h-9 rounded-2xl bg-gradient-to-tr text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0', getRoleBadge(role.name).avatarBg]">
-                                    <ShieldCheck v-if="role.name === 'Super Admin'" class="w-4 h-4" />
-                                    <Users v-else class="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-slate-900 dark:text-white text-xs leading-snug tracking-tight">{{ role.name }}</h3>
-                                    <p class="text-[11px] text-slate-400 font-medium">
-                                        {{ role.users_count || 0 }} {{ role.users_count === 1 ? 'member' : 'members' }}
-                                    </p>
-                                </div>
-                            </div>
-                            <span
-                                v-if="role.name === 'Super Admin'"
-                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-                            >
-                                <Lock class="w-2.5 h-2.5" /> Root
+                <div class="space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Organizational Security Roles</h2>
+                            <p class="text-xs text-slate-400 dark:text-slate-500">Overview of configured authority tiers and permission allocations</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-500 dark:text-slate-400">
+                                Total Capabilities: <strong class="text-slate-800 dark:text-slate-200">{{ totalPermissionsCount }} granular rights</strong>
                             </span>
                         </div>
+                    </div>
 
-                        <!-- Middle: Progress Meter -->
-                        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                            <div class="flex items-center justify-between text-[11px] mb-1.5 font-medium">
-                                <span class="text-slate-500 dark:text-slate-400">Capabilities</span>
-                                <span class="font-bold text-slate-800 dark:text-slate-200">
-                                    <template v-if="role.name === 'Super Admin'">
-                                        All ({{ totalPermissionsCount }}/{{ totalPermissionsCount }})
-                                    </template>
-                                    <template v-else>
+                    <!-- Role Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                        <div
+                            v-for="role in roles"
+                            :key="role.id"
+                            :class="[
+                                selectedFocusRoleId === role.id && matrixViewMode === 'role'
+                                    ? 'ring-2 ring-indigo-500 shadow-md border-indigo-500/50'
+                                    : 'hover:border-slate-300 dark:hover:border-slate-700',
+                                'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 shadow-xs flex flex-col justify-between transition-all'
+                            ]"
+                        >
+                            <!-- Card Top -->
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex items-center gap-2.5">
+                                    <div :class="['w-9 h-9 rounded-2xl bg-gradient-to-tr text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0', getRoleBadge(role.name).avatarBg]">
+                                        <ShieldCheck v-if="role.name === 'Super Admin'" class="w-4 h-4" />
+                                        <Users v-else class="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-slate-900 dark:text-white text-xs leading-snug tracking-tight">{{ role.name }}</h3>
+                                        <p class="text-[11px] text-slate-400 font-medium">
+                                            {{ role.users_count || 0 }} {{ role.users_count === 1 ? 'member' : 'members' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span
+                                    v-if="role.name === 'Super Admin'"
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                                >
+                                    <Lock class="w-2.5 h-2.5" /> Root
+                                </span>
+                            </div>
+
+                            <!-- Meter -->
+                            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                                <div class="flex items-center justify-between text-[11px] mb-1.5 font-medium">
+                                    <span class="text-slate-500 dark:text-slate-400">Capabilities</span>
+                                    <span class="font-bold text-slate-800 dark:text-slate-200">
                                         {{ getRolePermissionCount(role.id) }} / {{ totalPermissionsCount }}
-                                    </template>
-                                </span>
+                                        <span class="text-[10px] text-slate-400 font-mono ml-0.5">({{ getRolePermissionPercentage(role.id) }}%)</span>
+                                    </span>
+                                </div>
+                                <div class="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                    <div
+                                        :class="['h-full rounded-full transition-all duration-300', getRoleBadge(role.name).barBg]"
+                                        :style="{ width: `${getRolePermissionPercentage(role.id)}%` }"
+                                    ></div>
+                                </div>
                             </div>
-                            <div class="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                <div
-                                    :class="['h-full rounded-full transition-all duration-300', getRoleBadge(role.name).barBg]"
-                                    :style="{ width: role.name === 'Super Admin' ? '100%' : `${getRolePermissionPercentage(role.id)}%` }"
-                                ></div>
-                            </div>
-                        </div>
 
-                        <!-- Bottom: Action Controls -->
-                        <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                            <template v-if="role.name === 'Super Admin'">
-                                <span class="text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 font-semibold">
-                                    <Shield class="w-3 h-3" /> System Enforced
-                                </span>
-                                <span class="text-[10px] text-slate-400 font-mono">100%</span>
-                            </template>
-                            <template v-else>
-                                <button
-                                    type="button"
-                                    @click="grantAllForRole(role.id)"
-                                    class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer"
-                                >
-                                    Grant All
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="revokeAllForRole(role.id)"
-                                    class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
-                                >
-                                    Revoke All
-                                </button>
-                            </template>
+                            <!-- Footer Actions -->
+                            <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                                <template v-if="role.name === 'Super Admin'">
+                                    <span class="text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 font-semibold">
+                                        <Shield class="w-3 h-3" /> System Enforced
+                                    </span>
+                                    <button
+                                        type="button"
+                                        @click="selectedFocusRoleId = role.id; matrixViewMode = 'role'"
+                                        class="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                                    >
+                                        Inspect <ArrowRight class="w-3 h-3" />
+                                    </button>
+                                </template>
+                                <template v-else>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            @click="grantAllForRole(role.id)"
+                                            class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer"
+                                        >
+                                            Grant
+                                        </button>
+                                        <span class="text-slate-300 dark:text-slate-700 text-xs">·</span>
+                                        <button
+                                            type="button"
+                                            @click="revokeAllForRole(role.id)"
+                                            class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                                        >
+                                            Revoke
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="selectedFocusRoleId = role.id; matrixViewMode = 'role'"
+                                        class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer"
+                                    >
+                                        Inspect <ArrowRight class="w-3 h-3" />
+                                    </button>
+                                </template>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Search, Module Filters, & Action Bar -->
+                <!-- 2. Matrix Control Hub & Filters -->
                 <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs space-y-4">
-                    <!-- Top Row: Title & Save/Reset Actions -->
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <!-- Top Row: Hub Header, View Mode Switcher, & Save Actions -->
+                    <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                                 <Layers class="w-5 h-5" />
@@ -777,34 +995,67 @@ const formatDate = (dateStr) => {
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                            <button
-                                v-if="isMatrixDirty"
-                                type="button"
-                                @click="resetMatrix"
-                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                            >
-                                <RotateCcw class="w-3.5 h-3.5" /> Reset
-                            </button>
-                            <button
-                                type="button"
-                                :disabled="matrixForm.processing || !isMatrixDirty"
-                                @click="saveMatrix"
-                                :class="[
-                                    isMatrixDirty
-                                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 ring-2 ring-indigo-500/20'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed',
-                                    'inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer'
-                                ]"
-                            >
-                                <Loader2 v-if="matrixForm.processing" class="w-4 h-4 animate-spin" />
-                                <Save v-else class="w-4 h-4" />
-                                <span>{{ isMatrixDirty ? 'Save Matrix Changes' : 'Matrix Synchronized' }}</span>
-                            </button>
+                        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
+                            <!-- View Mode Segment Switcher -->
+                            <div class="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                                <button
+                                    type="button"
+                                    @click="matrixViewMode = 'table'"
+                                    :class="[
+                                        matrixViewMode === 'table'
+                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer'
+                                    ]"
+                                >
+                                    <LayoutGrid class="w-3.5 h-3.5" />
+                                    <span>Comparison Grid</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="matrixViewMode = 'role'"
+                                    :class="[
+                                        matrixViewMode === 'role'
+                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer'
+                                    ]"
+                                >
+                                    <Sliders class="w-3.5 h-3.5" />
+                                    <span>Role Inspector</span>
+                                </button>
+                            </div>
+
+                            <!-- Reset & Save Buttons -->
+                            <div class="flex items-center gap-2">
+                                <button
+                                    v-if="isMatrixDirty"
+                                    type="button"
+                                    @click="resetMatrix"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                >
+                                    <RotateCcw class="w-3.5 h-3.5" /> Reset
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="matrixForm.processing || !isMatrixDirty"
+                                    @click="saveMatrix"
+                                    :class="[
+                                        isMatrixDirty
+                                            ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 ring-2 ring-indigo-500/20'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed',
+                                        'inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer'
+                                    ]"
+                                >
+                                    <Loader2 v-if="matrixForm.processing" class="w-4 h-4 animate-spin" />
+                                    <Save v-else class="w-4 h-4" />
+                                    <span>{{ isMatrixDirty ? `Save (${matrixChangesCount})` : 'Matrix Saved' }}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Bottom Row: Search Box & Module Pills -->
+                    <!-- Bottom Row: Search Box & 11 Module Filter Pills -->
                     <div class="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                         <!-- Search Input -->
                         <div class="relative w-full md:w-80">
@@ -818,13 +1069,13 @@ const formatDate = (dateStr) => {
                             <button
                                 v-if="matrixSearch"
                                 @click="matrixSearch = ''"
-                                class="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                class="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                             >
                                 <X class="w-3.5 h-3.5" />
                             </button>
                         </div>
 
-                        <!-- Module Filter Pills -->
+                        <!-- Module Filter Pills with Icons -->
                         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
                             <button
                                 type="button"
@@ -852,22 +1103,22 @@ const formatDate = (dateStr) => {
                                 ]"
                             >
                                 <component :is="getModuleIcon(moduleKey)" class="w-3.5 h-3.5 opacity-80" />
-                                <span class="capitalize">{{ moduleKey }}</span>
+                                <span>{{ moduleMeta[moduleKey]?.title?.split('&')[0]?.trim() || moduleKey }}</span>
                                 <span class="text-[10px] opacity-75 font-mono">({{ perms.length }})</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 3. Matrix Grid Table Container -->
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden">
+                <!-- 3A. VIEW MODE 1: COMPARISON GRID TABLE -->
+                <div v-if="matrixViewMode === 'table'" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr class="bg-slate-50/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                                     <th class="p-5 min-w-[320px] max-w-[420px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px] sticky left-0 z-10 bg-slate-50/90 dark:bg-slate-800/80">
                                         <div class="flex items-center justify-between">
-                                            <span>System Capabilities & Modules</span>
+                                            <span>Operational Capabilities</span>
                                             <span class="text-[10px] normal-case text-slate-400 font-normal">
                                                 Showing {{ filteredPermissionsCount }} of {{ totalPermissionsCount }}
                                             </span>
@@ -892,14 +1143,24 @@ const formatDate = (dateStr) => {
                                                 </span>
                                             </div>
 
-                                            <button
-                                                v-if="role.name !== 'Super Admin'"
-                                                type="button"
-                                                @click="toggleAllForRole(role.id)"
-                                                class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline pt-0.5 cursor-pointer"
-                                            >
-                                                Toggle All
-                                            </button>
+                                            <div class="flex items-center gap-2 pt-0.5">
+                                                <button
+                                                    v-if="role.name !== 'Super Admin'"
+                                                    type="button"
+                                                    @click="toggleAllForRole(role.id)"
+                                                    class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                                >
+                                                    Toggle All
+                                                </button>
+                                                <span v-if="role.name !== 'Super Admin'" class="text-slate-300 dark:text-slate-700 text-[10px]">·</span>
+                                                <button
+                                                    type="button"
+                                                    @click="selectedFocusRoleId = role.id; matrixViewMode = 'role'"
+                                                    class="text-[10px] font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                                                >
+                                                    Inspect
+                                                </button>
+                                            </div>
                                         </div>
                                     </th>
                                 </tr>
@@ -1056,6 +1317,194 @@ const formatDate = (dateStr) => {
                     </div>
                 </div>
 
+                <!-- 3B. VIEW MODE 2: ROLE INSPECTOR (Bento Cards View) -->
+                <div v-else-if="matrixViewMode === 'role'" class="space-y-6">
+                    <!-- Role Selector Ribbon -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 shadow-xs">
+                        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none">
+                            <button
+                                v-for="role in roles"
+                                :key="role.id"
+                                type="button"
+                                @click="selectedFocusRoleId = role.id"
+                                :class="[
+                                    selectedFocusRoleId === role.id
+                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-bold'
+                                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60',
+                                    'px-4 py-2 rounded-2xl text-xs flex items-center gap-2.5 transition-all cursor-pointer shrink-0'
+                                ]"
+                            >
+                                <div :class="['w-5 h-5 rounded-lg flex items-center justify-center text-[10px]', selectedFocusRoleId === role.id ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700']">
+                                    <ShieldCheck v-if="role.name === 'Super Admin'" class="w-3 h-3" />
+                                    <Users v-else class="w-3 h-3" />
+                                </div>
+                                <span>{{ role.name }}</span>
+                                <span :class="['text-[10px] font-mono px-2 py-0.5 rounded-full', selectedFocusRoleId === role.id ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300']">
+                                    {{ getRolePermissionCount(role.id) }}/{{ totalPermissionsCount }}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Role Focus Header Card -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div class="flex items-center gap-4">
+                            <div :class="['w-14 h-14 rounded-3xl bg-gradient-to-tr text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0', getRoleBadge(selectedFocusRole.name).avatarBg]">
+                                <ShieldCheck v-if="selectedFocusRole.name === 'Super Admin'" class="w-7 h-7" />
+                                <Users v-else class="w-7 h-7" />
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight">{{ selectedFocusRole.name }}</h3>
+                                    <span :class="['text-[11px] font-bold px-2.5 py-0.5 rounded-full border', getRoleBadge(selectedFocusRole.name).bg]">
+                                        {{ selectedFocusRole.users_count || 0 }} {{ selectedFocusRole.users_count === 1 ? 'member' : 'members' }}
+                                    </span>
+                                    <span v-if="selectedFocusRole.name === 'Super Admin'" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                                        <Lock class="w-3 h-3" /> Root Security Role
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
+                                    {{ getRoleDescription(selectedFocusRole.name) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Right Stats & Actions -->
+                        <div class="w-full md:w-auto flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
+                            <!-- Progress Stats -->
+                            <div class="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl px-4 py-2.5 min-w-[160px]">
+                                <p class="text-[11px] text-slate-400 font-medium">Granted Rights</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                    {{ getRolePermissionCount(selectedFocusRole.id) }} of {{ totalPermissionsCount }}
+                                    <span class="text-xs font-normal text-slate-400">({{ getRolePermissionPercentage(selectedFocusRole.id) }}%)</span>
+                                </p>
+                            </div>
+
+                            <!-- Bulk Action Buttons -->
+                            <div v-if="selectedFocusRole.name !== 'Super Admin'" class="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    @click="grantAllForRole(selectedFocusRole.id)"
+                                    class="px-3.5 py-2 rounded-2xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
+                                >
+                                    Grant All
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="revokeAllForRole(selectedFocusRole.id)"
+                                    class="px-3.5 py-2 rounded-2xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer"
+                                >
+                                    Revoke All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bento Module Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div
+                            v-for="(perms, moduleKey) in filteredGroupedPermissions"
+                            :key="moduleKey"
+                            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs space-y-4"
+                        >
+                            <!-- Bento Card Header -->
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                        <component :is="getModuleIcon(moduleKey)" class="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-xs font-bold text-slate-900 dark:text-white">{{ moduleMeta[moduleKey]?.title || moduleKey }}</h4>
+                                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                                {{ getModuleActiveCount(moduleKey, selectedFocusRole.id) }}/{{ perms.length }} Active
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-0.5">{{ moduleMeta[moduleKey]?.description }}</p>
+                                    </div>
+                                </div>
+
+                                <div v-if="selectedFocusRole.name !== 'Super Admin'" class="shrink-0">
+                                    <button
+                                        type="button"
+                                        @click="toggleModuleForRole(moduleKey, selectedFocusRole.id)"
+                                        :class="[
+                                            isModuleAllActive(moduleKey, selectedFocusRole.id)
+                                                ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                                                : isModulePartiallyActive(moduleKey, selectedFocusRole.id)
+                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700',
+                                            'inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] transition-all cursor-pointer'
+                                        ]"
+                                    >
+                                        <CheckCheck v-if="isModuleAllActive(moduleKey, selectedFocusRole.id)" class="w-3 h-3" />
+                                        <Minus v-else-if="isModulePartiallyActive(moduleKey, selectedFocusRole.id)" class="w-3 h-3" />
+                                        <span>{{ isModuleAllActive(moduleKey, selectedFocusRole.id) ? 'All' : isModulePartiallyActive(moduleKey, selectedFocusRole.id) ? 'Partial' : 'Enable All' }}</span>
+                                    </button>
+                                </div>
+                                <div v-else>
+                                    <span class="text-[10px] text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1 opacity-70">
+                                        <Lock class="w-3 h-3" /> Full Access
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Permissions List -->
+                            <div class="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                                <div
+                                    v-for="p in perms"
+                                    :key="p.id"
+                                    class="p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors flex items-center justify-between gap-4 border border-slate-100 dark:border-slate-800/60"
+                                >
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-slate-900 dark:text-white text-xs">
+                                                {{ getPermissionMeta(p.name).title }}
+                                            </span>
+                                            <span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                                                {{ p.name }}
+                                            </span>
+                                            <span :class="['text-[10px] font-bold px-2 py-0.5 rounded-full border', getPermissionTypeBadge(getPermissionMeta(p.name).type).class]">
+                                                {{ getPermissionTypeBadge(getPermissionMeta(p.name).type).label }}
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                                            {{ getPermissionMeta(p.name).description }}
+                                        </p>
+                                    </div>
+
+                                    <!-- Switch Toggle -->
+                                    <div class="shrink-0 flex items-center">
+                                        <div v-if="selectedFocusRole.name === 'Super Admin'" class="inline-flex items-center">
+                                            <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                                <Lock class="w-3 h-3" /> Locked
+                                            </span>
+                                        </div>
+                                        <button
+                                            v-else
+                                            type="button"
+                                            @click="toggleMatrixPermission(selectedFocusRole.id, p.name)"
+                                            :class="[
+                                                isPermissionActive(selectedFocusRole.id, p.name)
+                                                    ? 'bg-indigo-600'
+                                                    : 'bg-slate-200 dark:bg-slate-700',
+                                                'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none cursor-pointer'
+                                            ]"
+                                        >
+                                            <span
+                                                :class="[
+                                                    isPermissionActive(selectedFocusRole.id, p.name) ? 'translate-x-5' : 'translate-x-0',
+                                                    'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out'
+                                                ]"
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 4. Floating Unsaved Changes Notification Drawer -->
                 <transition
                     enter-active-class="transition duration-200 ease-out"
@@ -1074,8 +1523,15 @@ const formatDate = (dateStr) => {
                                 <AlertCircle class="w-5 h-5 animate-pulse" />
                             </div>
                             <div>
-                                <p class="text-xs font-bold text-white">Unsaved Capability Changes</p>
-                                <p class="text-[11px] text-slate-300">You have adjusted permissions. Save to apply them immediately across all staff.</p>
+                                <p class="text-xs font-bold text-white flex items-center gap-2">
+                                    <span>Unsaved Permissions Modifications</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        {{ matrixChangesCount }} {{ matrixChangesCount === 1 ? 'change' : 'changes' }}
+                                    </span>
+                                </p>
+                                <p class="text-[11px] text-slate-300">
+                                    Pending modifications across {{ modifiedRolesCount }} {{ modifiedRolesCount === 1 ? 'role' : 'roles' }}. Save to enforce these rules.
+                                </p>
                             </div>
                         </div>
 
@@ -1083,9 +1539,9 @@ const formatDate = (dateStr) => {
                             <button
                                 type="button"
                                 @click="resetMatrix"
-                                class="px-3.5 py-2 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
                             >
-                                Discard
+                                <RotateCcw class="w-3.5 h-3.5" /> Discard
                             </button>
                             <button
                                 type="button"
@@ -1095,7 +1551,7 @@ const formatDate = (dateStr) => {
                             >
                                 <Loader2 v-if="matrixForm.processing" class="w-4 h-4 animate-spin" />
                                 <Save v-else class="w-4 h-4" />
-                                <span>Save Permissions</span>
+                                <span>Save Changes</span>
                             </button>
                         </div>
                     </div>

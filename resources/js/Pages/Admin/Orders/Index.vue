@@ -17,7 +17,9 @@ import {
     RotateCcw,
     Layers,
     Package,
-    Download
+    Download,
+    ShieldAlert,
+    ShieldCheck
 } from 'lucide-vue-next';
 import CustomSelect from '@/Components/CustomSelect.vue';
 
@@ -30,6 +32,7 @@ const props = defineProps({
 const search = ref(props.filters?.search || '');
 const activeStatus = ref(props.filters?.status || '');
 const paymentStatus = ref(props.filters?.payment_status || '');
+const fraudRisk = ref(props.filters?.fraud_risk || '');
 
 // Active popover menu states
 const openStatusMenuId = ref(null);
@@ -124,6 +127,7 @@ function applyFilters() {
             search: search.value || undefined,
             status: activeStatus.value || undefined,
             payment_status: paymentStatus.value || undefined,
+            fraud_risk: fraudRisk.value || undefined,
         },
         { preserveState: true, replace: true }
     );
@@ -286,6 +290,21 @@ function getPaymentBadge(status) {
                             compact
                         />
                     </div>
+
+                    <div class="flex items-center gap-2.5 w-full sm:w-48">
+                        <CustomSelect
+                            v-model="fraudRisk"
+                            @change="applyFilters"
+                            :options="[
+                                { value: '', label: 'All Risk Levels' },
+                                { value: 'low', label: 'Safe / Low Risk', icon: ShieldCheck },
+                                { value: 'medium', label: 'Medium Risk', icon: ShieldAlert },
+                                { value: 'high', label: 'High Risk (Flagged)', icon: ShieldAlert },
+                            ]"
+                            placeholder="All Risk Levels"
+                            compact
+                        />
+                    </div>
                 </div>
 
                 <!-- Export Actions -->
@@ -320,6 +339,7 @@ function getPaymentBadge(status) {
                                 <th class="px-6 py-4">Customer</th>
                                 <th class="px-6 py-4">Payment</th>
                                 <th class="px-6 py-4">Fulfillment Status</th>
+                                <th class="px-6 py-4">BD Fraud Shield</th>
                                 <th class="px-6 py-4">Total</th>
                                 <th class="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -336,6 +356,13 @@ function getPaymentBadge(status) {
                                         {{ order.order_number }}
                                     </Link>
                                     <span class="block text-[11px] text-slate-400 mt-0.5">{{ order.items_count }} items</span>
+
+                                    <div v-if="order.courier_consignment_id" class="mt-1">
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                            <Truck class="w-3 h-3 text-indigo-500" />
+                                            {{ order.courier_provider === 'pathao' ? 'PTH' : 'STF' }}: {{ order.courier_tracking_code || order.courier_consignment_id }}
+                                        </span>
+                                    </div>
                                 </td>
 
                                 <!-- Date -->
@@ -452,6 +479,47 @@ function getPaymentBadge(status) {
                                     </div>
                                 </td>
 
+                                <!-- BD Fraud Shield Column -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex flex-col gap-1 items-start">
+                                        <span
+                                            v-if="order.fraud_risk_level === 'high'"
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60"
+                                        >
+                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                            High Risk ({{ order.fraud_score }}%)
+                                        </span>
+                                        <span
+                                            v-else-if="order.fraud_risk_level === 'medium'"
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60"
+                                        >
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            Medium ({{ order.fraud_score }}%)
+                                        </span>
+                                        <span
+                                            v-else-if="order.fraud_risk_level === 'low'"
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60"
+                                        >
+                                            <ShieldCheck class="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                            Safe ({{ order.fraud_score || 0 }}%)
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                        >
+                                            Unscreened
+                                        </span>
+
+                                        <span
+                                            v-if="order.advance_delivery_charge"
+                                            class="text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                                            :class="order.advance_payment_status === 'paid' ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800' : 'text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800'"
+                                        >
+                                            ৳{{ order.advance_delivery_charge }} Adv ({{ order.advance_payment_status }})
+                                        </span>
+                                    </div>
+                                </td>
+
                                 <!-- Total -->
                                 <td class="px-6 py-4 font-bold text-xs text-slate-900 dark:text-white whitespace-nowrap">
                                     {{ formatCurrency(order.total) }}
@@ -460,6 +528,16 @@ function getPaymentBadge(status) {
                                 <!-- Actions -->
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-1.5">
+                                        <a
+                                            v-if="order.courier_consignment_id"
+                                            :href="route('admin.orders.courier-label', order.id)"
+                                            target="_blank"
+                                            class="p-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 transition-colors"
+                                            title="Print Courier Shipping Label"
+                                        >
+                                            <Printer class="w-3.5 h-3.5" />
+                                        </a>
+
                                         <Link
                                             :href="route('admin.orders.show', order.id)"
                                             class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
