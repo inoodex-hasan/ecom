@@ -7,6 +7,7 @@ use App\Models\Banner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,12 +43,11 @@ class BannerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $allBanners = Banner::all();
         $metrics = [
-            'total_banners' => $allBanners->count(),
-            'hero_slides' => $allBanners->where('placement', 'hero_slider')->count(),
-            'home_promos' => $allBanners->where('placement', 'home_banner')->count(),
-            'active_count' => $allBanners->where('is_active', true)->count(),
+            'total_banners' => Banner::count(),
+            'hero_slides' => Banner::where('placement', 'hero_slider')->count(),
+            'home_promos' => Banner::where('placement', 'home_banner')->count(),
+            'active_count' => Banner::where('is_active', true)->count(),
         ];
 
         return Inertia::render('Admin/Banners/Index', [
@@ -111,7 +111,7 @@ class BannerController extends Controller
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => 'required|image|max:3072',
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:3072', 'dimensions:max_width=4000,max_height=4000'],
         ]);
 
         $path = $request->file('image')->store('banners', 'public');
@@ -123,7 +123,19 @@ class BannerController extends Controller
 
     public function destroy(Banner $banner): RedirectResponse
     {
+        $img = $banner->image_url;
+        $mobileImg = $banner->mobile_image_url;
+
         $banner->delete();
+
+        foreach ([$img, $mobileImg] as $url) {
+            if ($url) {
+                $path = str_replace('/storage/', '', parse_url($url, PHP_URL_PATH) ?? $url);
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
 
         return redirect()->back()->with('success', 'Banner deleted successfully.');
     }

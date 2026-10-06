@@ -68,6 +68,12 @@ class InventoryAndBusinessLogicTest extends TestCase
 
         $response->assertRedirect();
         $this->assertEquals(12, $product->fresh()->stock_quantity);
+        $this->assertDatabaseHas('inventory_transactions', [
+            'product_id' => $product->id,
+            'type' => 'in',
+            'quantity_change' => 2,
+            'reason' => 'customer_return',
+        ]);
 
         // Uncancel the order back to processing
         $response = $this->actingAs($this->admin)->patch("/admin/orders/{$order->id}/status", [
@@ -76,6 +82,87 @@ class InventoryAndBusinessLogicTest extends TestCase
 
         $response->assertRedirect();
         $this->assertEquals(10, $product->fresh()->stock_quantity);
+        $this->assertDatabaseHas('inventory_transactions', [
+            'product_id' => $product->id,
+            'type' => 'out',
+            'quantity_change' => -2,
+            'reason' => 'order_fulfillment',
+        ]);
+    }
+
+    public function test_cancelling_order_with_variants_replenishes_variant_stock_and_creates_transaction(): void
+    {
+        $product = Product::create([
+            'name' => 'Premium T-Shirt',
+            'sku' => 'TSHIRT-BASE',
+            'price' => 25.00,
+            'stock_quantity' => 15,
+            'low_stock_threshold' => 5,
+            'status' => 'published',
+            'has_variants' => true,
+        ]);
+
+        $variant = $product->variants()->create([
+            'sku' => 'TSHIRT-L-BLK',
+            'price' => 25.00,
+            'stock_quantity' => 5,
+            'option_values' => ['Size' => 'L', 'Color' => 'Black'],
+            'is_active' => true,
+        ]);
+
+        $customer = Customer::create([
+            'first_name' => 'Sara',
+            'last_name' => 'Connor',
+            'email' => 'sara@example.com',
+        ]);
+
+        $order = Order::create([
+            'order_number' => 'ORD-VAR-1',
+            'customer_id' => $customer->id,
+            'status' => 'processing',
+            'payment_status' => 'paid',
+            'total' => 50.00,
+        ]);
+
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'product_name' => 'Premium T-Shirt - L / Black',
+            'sku' => 'TSHIRT-L-BLK',
+            'unit_price' => 25.00,
+            'quantity' => 2,
+            'total' => 50.00,
+        ]);
+
+        // Cancel order -> variant stock should increase from 5 to 7, and parent product re-synced
+        $response = $this->actingAs($this->admin)->patch("/admin/orders/{$order->id}/status", [
+            'status' => 'cancelled',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertEquals(7, $variant->fresh()->stock_quantity);
+        $this->assertDatabaseHas('inventory_transactions', [
+            'product_id' => $product->id,
+            'product_variant_id' => $variant->id,
+            'type' => 'in',
+            'quantity_change' => 2,
+            'reason' => 'customer_return',
+        ]);
+
+        // Reactivate order -> variant stock should reduce back to 5
+        $response = $this->actingAs($this->admin)->patch("/admin/orders/{$order->id}/status", [
+            'status' => 'processing',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertEquals(5, $variant->fresh()->stock_quantity);
+        $this->assertDatabaseHas('inventory_transactions', [
+            'product_id' => $product->id,
+            'product_variant_id' => $variant->id,
+            'type' => 'out',
+            'quantity_change' => -2,
+            'reason' => 'order_fulfillment',
+        ]);
     }
 
     public function test_customer_lifetime_metrics_sync_accurately_on_payment_status_changes(): void

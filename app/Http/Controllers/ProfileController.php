@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,12 +33,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $user->fill($request->safe()->only(['name', 'email']));
 
-        if ($request->hasFile('avatar')) {
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = '/storage/'.$path;
-        } elseif ($request->boolean('remove_avatar')) {
-            $user->avatar = null;
-        }
+        $this->handleAvatar($request, $user);
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
@@ -60,16 +56,38 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
-        if ($request->hasFile('avatar')) {
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = '/storage/'.$path;
-        } elseif ($request->boolean('remove_avatar')) {
-            $user->avatar = null;
-        }
+        $this->handleAvatar($request, $user);
 
         $user->save();
 
         return Redirect::back()->with('success', 'Avatar updated successfully.');
+    }
+
+    /**
+     * Handle avatar file upload or removal and unlink superseded image.
+     */
+    protected function handleAvatar(Request $request, $user): void
+    {
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar && str_starts_with($user->avatar, '/storage/')) {
+                $oldPath = str_replace('/storage/', '', $user->avatar);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = '/storage/'.$path;
+        } elseif ($request->boolean('remove_avatar')) {
+            if ($user->avatar && str_starts_with($user->avatar, '/storage/')) {
+                $oldPath = str_replace('/storage/', '', $user->avatar);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+
+            $user->avatar = null;
+        }
     }
 
     /**

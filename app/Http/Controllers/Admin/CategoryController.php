@@ -7,6 +7,8 @@ use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -101,6 +103,14 @@ class CategoryController extends Controller
             ? Str::slug($validated['slug'])
             : Str::slug($validated['name']);
 
+        // Ensure unique slug excluding current category
+        $baseSlug = $slug;
+        $counter = 1;
+        while (Category::where('slug', $slug)->where('id', '!=', $category->id)->exists()) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
+
         $category->update([
             ...$validated,
             'slug' => $slug,
@@ -121,7 +131,7 @@ class CategoryController extends Controller
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => 'required|image|max:2048',
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048', 'dimensions:max_width=4000,max_height=4000'],
         ]);
 
         $path = $request->file('image')->store('categories', 'public');
@@ -133,17 +143,28 @@ class CategoryController extends Controller
 
     public function destroy(Category $category): RedirectResponse
     {
-        // If category has products, detach or reassign
-        if ($category->products()->exists()) {
-            $category->products()->update(['category_id' => null]);
-        }
+        $imageToDelete = $category->image;
 
-        // If category has children, promote them to root level
-        if ($category->children()->exists()) {
-            $category->children()->update(['parent_id' => null]);
-        }
+        DB::transaction(function () use ($category) {
+            // If category has products, detach or reassign
+            if ($category->products()->exists()) {
+                $category->products()->update(['category_id' => null]);
+            }
 
-        $category->delete();
+            // If category has children, promote them to root level
+            if ($category->children()->exists()) {
+                $category->children()->update(['parent_id' => null]);
+            }
+
+            $category->delete();
+        });
+
+        if ($imageToDelete) {
+            $path = str_replace('/storage/', '', parse_url($imageToDelete, PHP_URL_PATH) ?? $imageToDelete);
+            if ($path && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
 
         return redirect()->back()->with('success', 'Category deleted successfully.');
     }

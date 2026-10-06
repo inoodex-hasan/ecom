@@ -41,26 +41,38 @@ class ReviewController extends Controller
             $query->where('product_id', $request->input('product_id'));
         }
 
-        $reviews = $query->orderBy('created_at', 'desc')->get();
+        $reviews = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
 
-        $allReviews = Review::all();
-        $approvedReviews = $allReviews->where('status', 'approved');
+        $rawStatusCounts = Review::toBase()
+            ->selectRaw('status, count(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $rawStarCounts = Review::toBase()
+            ->selectRaw('rating, count(*) as count')
+            ->groupBy('rating')
+            ->pluck('count', 'rating');
 
         $starBreakdown = [
-            5 => $allReviews->where('rating', 5)->count(),
-            4 => $allReviews->where('rating', 4)->count(),
-            3 => $allReviews->where('rating', 3)->count(),
-            2 => $allReviews->where('rating', 2)->count(),
-            1 => $allReviews->where('rating', 1)->count(),
+            5 => (int) ($rawStarCounts[5] ?? 0),
+            4 => (int) ($rawStarCounts[4] ?? 0),
+            3 => (int) ($rawStarCounts[3] ?? 0),
+            2 => (int) ($rawStarCounts[2] ?? 0),
+            1 => (int) ($rawStarCounts[1] ?? 0),
         ];
 
+        $approvedCount = (int) ($rawStatusCounts['approved'] ?? 0);
+        $avgRating = $approvedCount > 0
+            ? round((float) Review::where('status', 'approved')->avg('rating'), 2)
+            : 0.00;
+
         $metrics = [
-            'total_reviews' => $allReviews->count(),
-            'pending_count' => $allReviews->where('status', 'pending')->count(),
-            'approved_count' => $approvedReviews->count(),
-            'rejected_count' => $allReviews->where('status', 'rejected')->count(),
-            'spam_count' => $allReviews->where('status', 'spam')->count(),
-            'average_rating' => $approvedReviews->count() > 0 ? round((float) $approvedReviews->avg('rating'), 2) : 0.00,
+            'total_reviews' => (int) $rawStatusCounts->sum(),
+            'pending_count' => (int) ($rawStatusCounts['pending'] ?? 0),
+            'approved_count' => $approvedCount,
+            'rejected_count' => (int) ($rawStatusCounts['rejected'] ?? 0),
+            'spam_count' => (int) ($rawStatusCounts['spam'] ?? 0),
+            'average_rating' => $avgRating,
             'star_breakdown' => $starBreakdown,
         ];
 

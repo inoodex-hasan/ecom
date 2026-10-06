@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -21,7 +22,10 @@ class StaffController extends Controller
         $search = $request->input('search');
         $selectedRole = $request->input('role');
 
-        $staff = User::query()
+        $staff = User::where(function ($q) {
+            $q->whereHas('roles')
+                ->orWhere('role', '!=', 'customer');
+        })
             ->with(['roles', 'permissions'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -168,15 +172,21 @@ class StaffController extends Controller
         }
 
         $staffName = $staff->name;
-        $staff->roles()->detach();
-        $staff->permissions()->detach();
-        $staff->delete();
+        DB::transaction(function () use ($staff) {
+            $staff->roles()->detach();
+            $staff->permissions()->detach();
+            $staff->delete();
+        });
 
         return redirect()->back()->with('success', "Team member {$staffName} deleted successfully.");
     }
 
     public function updateRolePermissions(Request $request, Role $role): RedirectResponse
     {
+        if (! $request->user()->isAdmin()) {
+            abort(403, 'Only Super Admins can update role permissions.');
+        }
+
         if ($role->name === 'Super Admin') {
             return redirect()->back()->with('error', 'Super Admin permissions cannot be restricted.');
         }
@@ -193,6 +203,10 @@ class StaffController extends Controller
 
     public function bulkUpdateRolePermissions(Request $request): RedirectResponse
     {
+        if (! $request->user()->isAdmin()) {
+            abort(403, 'Only Super Admins can update the role permissions matrix.');
+        }
+
         $validated = $request->validate([
             'matrix' => ['required', 'array'],
             'matrix.*.role_id' => ['required', 'exists:roles,id'],

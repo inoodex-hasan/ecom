@@ -519,7 +519,7 @@ function formatPlacement(placement) {
                                 <input
                                     v-model="form.link_url"
                                     type="text"
-                                    placeholder="e.g. /products?category=apparel or /flash-sales"
+                                    placeholder="e.g. /products?category=apparel or /campaigns"
                                     class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>

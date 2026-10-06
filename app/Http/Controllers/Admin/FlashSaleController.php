@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,22 +24,22 @@ class FlashSaleController extends Controller
             ->orderBy('starts_at', 'desc')
             ->get();
 
-        $allSales = FlashSale::with('items')->get();
         $now = now();
-
         $metrics = [
-            'total_campaigns' => $allSales->count(),
-            'active_running' => $allSales->filter(fn ($s) => $s->is_active && $s->starts_at <= $now && $s->ends_at >= $now)->count(),
-            'upcoming' => $allSales->filter(fn ($s) => $s->is_active && $s->starts_at > $now)->count(),
+            'total_campaigns' => FlashSale::count(),
+            'active_running' => FlashSale::where('is_active', true)->where('starts_at', '<=', $now)->where('ends_at', '>=', $now)->count(),
+            'upcoming' => FlashSale::where('is_active', true)->where('starts_at', '>', $now)->count(),
             'total_items_on_sale' => FlashSaleItem::count(),
             'total_units_claimed' => (int) FlashSaleItem::sum('sold_count'),
         ];
 
         // Compact product list for modal selector
         $products = Product::where('status', 'published')
+            ->latest()
+            ->take(50)
             ->get(['id', 'name', 'sku', 'price', 'compare_price', 'primary_image']);
 
-        return Inertia::render('Admin/FlashSales/Index', [
+        return Inertia::render('Admin/Campaigns/Index', [
             'flashSales' => $sales,
             'metrics' => $metrics,
             'availableProducts' => $products,
@@ -77,8 +78,11 @@ class FlashSaleController extends Controller
                 'is_active' => $validated['is_active'] ?? true,
             ]);
 
+            $productIds = collect($validated['items'])->pluck('product_id');
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
             foreach ($validated['items'] as $item) {
-                $product = Product::find($item['product_id']);
+                $product = $products->get($item['product_id']);
                 $discount = $item['discount_percentage'] ?? null;
                 if (! $discount && $product && $product->price > 0) {
                     $discount = round((($product->price - $item['flash_price']) / $product->price) * 100, 1);
@@ -94,7 +98,7 @@ class FlashSaleController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Flash sale campaign launched successfully.');
+        return redirect()->back()->with('success', 'Campaign launched successfully.');
     }
 
     public function update(Request $request, FlashSale $flashSale): RedirectResponse
@@ -133,8 +137,11 @@ class FlashSaleController extends Controller
             $existingSoldMap = $flashSale->items->pluck('sold_count', 'product_id')->toArray();
             $flashSale->items()->delete();
 
+            $productIds = collect($validated['items'])->pluck('product_id');
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
             foreach ($validated['items'] as $item) {
-                $product = Product::find($item['product_id']);
+                $product = $products->get($item['product_id']);
                 $discount = $item['discount_percentage'] ?? null;
                 if (! $discount && $product && $product->price > 0) {
                     $discount = round((($product->price - $item['flash_price']) / $product->price) * 100, 1);
@@ -150,20 +157,20 @@ class FlashSaleController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Flash sale campaign updated successfully.');
+        return redirect()->back()->with('success', 'Campaign updated successfully.');
     }
 
     public function toggleStatus(FlashSale $flashSale): RedirectResponse
     {
         $flashSale->update(['is_active' => ! $flashSale->is_active]);
 
-        return redirect()->back()->with('success', 'Flash sale status updated.');
+        return redirect()->back()->with('success', 'Campaign status updated.');
     }
 
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => 'required|image|max:3072',
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:3072', 'dimensions:max_width=4000,max_height=4000'],
         ]);
 
         $path = $request->file('image')->store('flash-sales', 'public');
@@ -175,8 +182,16 @@ class FlashSaleController extends Controller
 
     public function destroy(FlashSale $flashSale): RedirectResponse
     {
+        $banner = $flashSale->banner_image;
         $flashSale->delete();
 
-        return redirect()->back()->with('success', 'Flash sale campaign removed.');
+        if ($banner) {
+            $path = str_replace('/storage/', '', parse_url($banner, PHP_URL_PATH) ?? $banner);
+            if ($path && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Campaign removed.');
     }
 }

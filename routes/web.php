@@ -21,7 +21,11 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect()->route('admin.dashboard');
+        if (request()->user()->can('dashboard.view')) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return redirect()->route('dashboard');
     }
 
     return Inertia::render('Auth/Login', [
@@ -31,7 +35,11 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return redirect()->route('admin.dashboard');
+    if (request()->user()->can('dashboard.view')) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    return Inertia::render('Dashboard');
 })->middleware(['auth'])->name('dashboard');
 
 // Admin Protected Routes
@@ -41,7 +49,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     });
 
     // Analytics Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
 
     // Products Management
     Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('can:products.view');
@@ -84,8 +92,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::patch('/banners/{banner}/toggle-status', [BannerController::class, 'toggleStatus'])->name('banners.toggle-status')->middleware('can:banners.manage');
     Route::delete('/banners/{banner}', [BannerController::class, 'destroy'])->name('banners.destroy')->middleware('can:banners.manage');
 
-    // Flash Sales & Promotions Management
-    Route::get('/flash-sales', [FlashSaleController::class, 'index'])->name('flash-sales.index')->middleware('can:promotions.view');
+    // Marketing Campaigns & Promotional Events Management
+    Route::get('/campaigns', [FlashSaleController::class, 'index'])->name('campaigns.index')->middleware('can:promotions.view');
+    Route::post('/campaigns', [FlashSaleController::class, 'store'])->name('campaigns.store')->middleware('can:promotions.manage');
+    Route::post('/campaigns/upload-image', [FlashSaleController::class, 'uploadImage'])->name('campaigns.upload-image')->middleware('can:promotions.manage');
+    Route::put('/campaigns/{flashSale}', [FlashSaleController::class, 'update'])->name('campaigns.update')->middleware('can:promotions.manage');
+    Route::patch('/campaigns/{flashSale}/toggle-status', [FlashSaleController::class, 'toggleStatus'])->name('campaigns.toggle-status')->middleware('can:promotions.manage');
+    Route::delete('/campaigns/{flashSale}', [FlashSaleController::class, 'destroy'])->name('campaigns.destroy')->middleware('can:promotions.manage');
+
+    // Legacy flash-sales redirects & aliases
+    Route::get('/flash-sales', fn () => redirect()->route('admin.campaigns.index'))->name('flash-sales.index');
     Route::post('/flash-sales', [FlashSaleController::class, 'store'])->name('flash-sales.store')->middleware('can:promotions.manage');
     Route::post('/flash-sales/upload-image', [FlashSaleController::class, 'uploadImage'])->name('flash-sales.upload-image')->middleware('can:promotions.manage');
     Route::put('/flash-sales/{flashSale}', [FlashSaleController::class, 'update'])->name('flash-sales.update')->middleware('can:promotions.manage');
@@ -98,7 +114,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::put('/coupons/{coupon}', [CouponController::class, 'update'])->name('coupons.update')->middleware('can:coupons.manage');
     Route::patch('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus'])->name('coupons.toggle-status')->middleware('can:coupons.manage');
     Route::delete('/coupons/{coupon}', [CouponController::class, 'destroy'])->name('coupons.destroy')->middleware('can:coupons.manage');
-    Route::post('/coupons/validate', [CouponController::class, 'validateApi'])->name('coupons.validate');
+    Route::post('/coupons/validate', [CouponController::class, 'validateApi'])->name('coupons.validate')->middleware(['can:coupons.view', 'throttle:60,1']);
 
     // Customer Reviews & Moderation Desk
     Route::get('/reviews', [ReviewController::class, 'index'])->name('reviews.index')->middleware('can:reviews.view');

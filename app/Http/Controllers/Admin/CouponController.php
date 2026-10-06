@@ -48,13 +48,13 @@ class CouponController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $allCoupons = Coupon::all();
         $now = now();
-
         $metrics = [
-            'total_coupons' => $allCoupons->count(),
-            'active_coupons' => $allCoupons->filter(fn ($c) => $c->is_active && (! $c->expires_at || $c->expires_at >= $now))->count(),
-            'total_redemptions' => (int) $allCoupons->sum('total_used'),
+            'total_coupons' => Coupon::count(),
+            'active_coupons' => Coupon::where('is_active', true)
+                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', $now))
+                ->count(),
+            'total_redemptions' => (int) Coupon::sum('total_used'),
             'total_discount_claimed' => (float) CouponUsage::sum('discount_amount'),
         ];
 

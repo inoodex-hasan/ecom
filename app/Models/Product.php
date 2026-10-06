@@ -157,8 +157,10 @@ class Product extends Model
 
     public function scopeNewArrival(Builder $query): Builder
     {
-        return $query->where('is_new_arrival', true)
-            ->orWhere('created_at', '>=', now()->subDays(30));
+        return $query->where(function ($q) {
+            $q->where('is_new_arrival', true)
+                ->orWhere('created_at', '>=', now()->subDays(30));
+        });
     }
 
     public function scopeLowStock(Builder $query): Builder

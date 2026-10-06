@@ -34,11 +34,15 @@ class SettingController extends Controller
         ]);
 
         if ($request->has('settings') && is_array($request->input('settings'))) {
+            $upsertData = [];
             foreach ($request->input('settings') as $key => $value) {
-                Setting::updateOrCreate(
-                    ['key' => $key],
-                    ['value' => (string) $value]
-                );
+                $upsertData[] = [
+                    'key' => (string) $key,
+                    'value' => (string) $value,
+                ];
+            }
+            if (! empty($upsertData)) {
+                Setting::upsert($upsertData, ['key'], ['value']);
             }
         }
 

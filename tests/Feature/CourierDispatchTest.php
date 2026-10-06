@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\CourierService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CourierDispatchTest extends TestCase
@@ -184,5 +187,44 @@ class CourierDispatchTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get(route('admin.orders.courier-label', $order->id));
         $response->assertOk();
+    }
+
+    public function test_courier_dispatch_failure_returns_sanitized_error_message(): void
+    {
+        Setting::set('steadfast_api_key', 'test_key');
+        Setting::set('steadfast_secret_key', 'test_secret');
+
+        Http::fake([
+            'https://portal.steadfast.com.bd/*' => function () {
+                throw new ConnectionException('cURL error 7: Failed to connect to portal.steadfast.com.bd port 443: Connection refused');
+            },
+        ]);
+
+        $customer = Customer::create([
+            'first_name' => 'Error',
+            'last_name' => 'Tester',
+            'email' => 'err@example.com',
+            'phone' => '01700000000',
+        ]);
+
+        $order = Order::create([
+            'order_number' => 'ORD-ERR-505',
+            'customer_id' => $customer->id,
+            'subtotal' => 1000,
+            'total' => 1000,
+            'payment_method' => 'cod',
+            'payment_status' => 'unpaid',
+            'status' => 'processing',
+        ]);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.orders.courier-dispatch', $order->id), [
+            'provider' => 'steadfast',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('courier');
+        $errorMessage = session('errors')->first('courier');
+        $this->assertStringNotContainsString('cURL error 7', $errorMessage);
+        $this->assertStringContainsString('Unable to connect to Steadfast Courier', $errorMessage);
     }
 }

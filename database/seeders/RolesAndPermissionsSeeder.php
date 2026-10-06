@@ -20,6 +20,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Define modular permissions
         $permissions = [
+            // Analytics Dashboard
+            'dashboard.view',
+
             // Products
             'products.view',
             'products.create',
@@ -86,6 +89,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // 2. Store Manager Role
         $manager = Role::firstOrCreate(['name' => 'Store Manager', 'guard_name' => 'web']);
         $manager->syncPermissions([
+            'dashboard.view',
             'products.view', 'products.create', 'products.edit', 'products.delete',
             'inventory.view', 'inventory.adjust',
             'banners.view', 'banners.manage',
@@ -102,6 +106,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // 3. Fulfillment Staff Role
         $fulfillment = Role::firstOrCreate(['name' => 'Fulfillment Staff', 'guard_name' => 'web']);
         $fulfillment->syncPermissions([
+            'dashboard.view',
             'orders.view', 'orders.edit', 'orders.update_status', 'orders.invoice',
             'products.view',
             'inventory.view', 'inventory.adjust',
@@ -112,6 +117,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // 4. Catalog Specialist Role
         $catalog = Role::firstOrCreate(['name' => 'Catalog Specialist', 'guard_name' => 'web']);
         $catalog->syncPermissions([
+            'dashboard.view',
             'products.view', 'products.create', 'products.edit',
             'categories.view', 'categories.create', 'categories.edit',
         ]);
@@ -119,15 +125,19 @@ class RolesAndPermissionsSeeder extends Seeder
         // 5. Customer Support Role
         $support = Role::firstOrCreate(['name' => 'Customer Support', 'guard_name' => 'web']);
         $support->syncPermissions([
+            'dashboard.view',
             'orders.view',
             'customers.view',
             'products.view',
         ]);
 
         // Assign Roles to existing seed users
-        $adminUser = User::where('email', 'admin@ecom.test')->first();
-        if ($adminUser) {
-            $adminUser->syncRoles(['Super Admin']);
+        $adminEmails = ['admin@ecom.test', 'hello@inoodex.com'];
+        foreach ($adminEmails as $email) {
+            $adminUser = User::where('email', $email)->first();
+            if ($adminUser) {
+                $adminUser->syncRoles(['Super Admin']);
+            }
         }
 
         $managerUser = User::where('email', 'manager@ecom.test')->first();

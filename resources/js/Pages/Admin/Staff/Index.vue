@@ -374,15 +374,15 @@ const permissionMeta = {
         type: 'write',
     },
 
-    // Promotions & Flash Sales
+    // Campaigns & Promotions
     'promotions.view': {
-        title: 'View Promotions',
-        description: 'Monitor active flash sales, countdown deals, and time-limited promotions',
+        title: 'View Campaigns',
+        description: 'Monitor active campaigns, countdown deals, and time-limited promotions',
         type: 'read',
     },
     'promotions.manage': {
-        title: 'Manage Promotions',
-        description: 'Create flash sale events, set countdown timers, and assign discount items',
+        title: 'Manage Campaigns',
+        description: 'Create promotional campaigns, set countdown timers, and assign discount items',
         type: 'write',
     },
 
@@ -486,8 +486,8 @@ const moduleMeta = {
         icon: ImageIcon,
     },
     promotions: {
-        title: 'Promotions & Flash Sales',
-        description: 'Time-limited flash deals, countdown sales, and promotional pricing events',
+        title: 'Campaigns & Promotions',
+        description: 'Time-limited promotional campaigns, countdown sales, and promotional pricing events',
         icon: Zap,
     },
     coupons: {

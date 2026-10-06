@@ -6,11 +6,14 @@ use App\Exports\ProductsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\InventoryTransaction;
 use App\Models\Product;
 use App\Models\ProductImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -22,7 +25,9 @@ class ProductController extends Controller
 {
     public function uploadImage(Request $request): JsonResponse
     {
-        $request->validate(['image' => 'required|image|max:2048']);
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120', 'dimensions:max_width=4000,max_height=4000'],
+        ]);
         $path = $request->file('image')->store('products', 'public');
 
         return response()->json(['url' => Storage::url($path)]);
@@ -121,7 +126,7 @@ class ProductController extends Controller
             'gallery_images' => 'nullable|array',
             'gallery_images.*' => 'string',
             'variants' => 'nullable|array',
-            'variants.*.sku' => 'required_with:variants|string|max:100',
+            'variants.*.sku' => 'required_with:variants|string|max:100|distinct|unique:product_variants,sku',
             'variants.*.price' => 'required_with:variants|numeric|min:0',
             'variants.*.compare_price' => 'nullable|numeric|min:0',
             'variants.*.cost_price' => 'nullable|numeric|min:0',
@@ -134,45 +139,47 @@ class ProductController extends Controller
         $variantsData = $validated['variants'] ?? [];
         unset($validated['variants']);
 
-        $product = Product::create([
-            ...$validated,
-            'product_type' => $validated['product_type'] ?? 'standard',
-            'unit' => $validated['unit'] ?? 'piece',
-            'min_order_quantity' => $validated['min_order_quantity'] ?? 1,
-            'quantity_step' => $validated['quantity_step'] ?? 1,
-            'slug' => Str::slug($validated['name']).'-'.Str::lower(Str::random(5)),
-        ]);
+        DB::transaction(function () use ($validated, $variantsData) {
+            $product = Product::create([
+                ...$validated,
+                'product_type' => $validated['product_type'] ?? 'standard',
+                'unit' => $validated['unit'] ?? 'piece',
+                'min_order_quantity' => $validated['min_order_quantity'] ?? 1,
+                'quantity_step' => $validated['quantity_step'] ?? 1,
+                'slug' => Str::slug($validated['name']).'-'.Str::lower(Str::random(5)),
+            ]);
 
-        if (! empty($validated['gallery_images'])) {
-            foreach ($validated['gallery_images'] as $idx => $imgPath) {
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'image_path' => $imgPath,
-                    'is_primary' => $idx === 0 && empty($product->primary_image),
-                    'sort_order' => $idx + 1,
-                ]);
+            if (! empty($validated['gallery_images'])) {
+                foreach ($validated['gallery_images'] as $idx => $imgPath) {
+                    ProductImage::create([
+                        'product_id' => $product->id,
+                        'image_path' => $imgPath,
+                        'is_primary' => $idx === 0 && empty($product->primary_image),
+                        'sort_order' => $idx + 1,
+                    ]);
+                }
             }
-        }
 
-        if ($product->has_variants && ! empty($variantsData)) {
-            $totalVariantStock = 0;
-            foreach ($variantsData as $variant) {
-                $qty = (int) ($variant['stock_quantity'] ?? 0);
-                $totalVariantStock += $qty;
-                $product->variants()->create([
-                    'sku' => $variant['sku'],
-                    'barcode' => $variant['barcode'] ?? null,
-                    'price' => $variant['price'],
-                    'compare_price' => $variant['compare_price'] ?? null,
-                    'cost_price' => $variant['cost_price'] ?? null,
-                    'stock_quantity' => $qty,
-                    'image' => $variant['image'] ?? null,
-                    'option_values' => $variant['option_values'] ?? [],
-                    'is_active' => $variant['is_active'] ?? true,
-                ]);
+            if ($product->has_variants && ! empty($variantsData)) {
+                $totalVariantStock = 0;
+                foreach ($variantsData as $variant) {
+                    $qty = (int) ($variant['stock_quantity'] ?? 0);
+                    $totalVariantStock += $qty;
+                    $product->variants()->create([
+                        'sku' => $variant['sku'],
+                        'barcode' => $variant['barcode'] ?? null,
+                        'price' => $variant['price'],
+                        'compare_price' => $variant['compare_price'] ?? null,
+                        'cost_price' => $variant['cost_price'] ?? null,
+                        'stock_quantity' => $qty,
+                        'image' => $variant['image'] ?? null,
+                        'option_values' => $variant['option_values'] ?? [],
+                        'is_active' => $variant['is_active'] ?? true,
+                    ]);
+                }
+                $product->update(['stock_quantity' => $totalVariantStock]);
             }
-            $product->update(['stock_quantity' => $totalVariantStock]);
-        }
+        });
 
         return redirect()->route('admin.products.index')->with('success', 'Product created successfully.');
     }
@@ -213,7 +220,7 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'variants' => 'nullable|array',
             'variants.*.id' => 'nullable|integer',
-            'variants.*.sku' => 'required_with:variants|string|max:100',
+            'variants.*.sku' => 'required_with:variants|string|max:100|distinct',
             'variants.*.price' => 'required_with:variants|numeric|min:0',
             'variants.*.compare_price' => 'nullable|numeric|min:0',
             'variants.*.cost_price' => 'nullable|numeric|min:0',
@@ -226,14 +233,16 @@ class ProductController extends Controller
         $variantsData = $validated['variants'] ?? [];
         unset($validated['variants']);
 
-        $product->update($validated);
+        DB::transaction(function () use ($product, $validated, $variantsData) {
+            $product->update($validated);
 
-        if ($product->has_variants && ! empty($variantsData)) {
-            $existingVariantIds = [];
-            foreach ($variantsData as $variant) {
-                if (! empty($variant['id'])) {
-                    $existingVariant = $product->variants()->find($variant['id']);
-                    if ($existingVariant) {
+            if ($product->has_variants && ! empty($variantsData)) {
+                $existingVariants = $product->variants->keyBy('id');
+                $existingVariantIds = [];
+
+                foreach ($variantsData as $variant) {
+                    if (! empty($variant['id']) && $existingVariants->has($variant['id'])) {
+                        $existingVariant = $existingVariants->get($variant['id']);
                         $existingVariant->update([
                             'sku' => $variant['sku'],
                             'barcode' => $variant['barcode'] ?? null,
@@ -249,28 +258,28 @@ class ProductController extends Controller
 
                         continue;
                     }
+
+                    $newVar = $product->variants()->create([
+                        'sku' => $variant['sku'],
+                        'barcode' => $variant['barcode'] ?? null,
+                        'price' => $variant['price'],
+                        'compare_price' => $variant['compare_price'] ?? null,
+                        'cost_price' => $variant['cost_price'] ?? null,
+                        'stock_quantity' => $variant['stock_quantity'] ?? 0,
+                        'image' => $variant['image'] ?? null,
+                        'option_values' => $variant['option_values'] ?? [],
+                        'is_active' => $variant['is_active'] ?? true,
+                    ]);
+                    $existingVariantIds[] = $newVar->id;
                 }
 
-                $newVar = $product->variants()->create([
-                    'sku' => $variant['sku'],
-                    'barcode' => $variant['barcode'] ?? null,
-                    'price' => $variant['price'],
-                    'compare_price' => $variant['compare_price'] ?? null,
-                    'cost_price' => $variant['cost_price'] ?? null,
-                    'stock_quantity' => $variant['stock_quantity'] ?? 0,
-                    'image' => $variant['image'] ?? null,
-                    'option_values' => $variant['option_values'] ?? [],
-                    'is_active' => $variant['is_active'] ?? true,
-                ]);
-                $existingVariantIds[] = $newVar->id;
+                // Remove deleted variants
+                $product->variants()->whereNotIn('id', $existingVariantIds)->delete();
+                $product->update(['stock_quantity' => (int) $product->variants()->sum('stock_quantity')]);
+            } elseif (! $product->has_variants) {
+                $product->variants()->delete();
             }
-
-            // Remove deleted variants
-            $product->variants()->whereNotIn('id', $existingVariantIds)->delete();
-            $product->update(['stock_quantity' => (int) $product->variants()->sum('stock_quantity')]);
-        } elseif (! $product->has_variants) {
-            $product->variants()->delete();
-        }
+        });
 
         return redirect()->back()->with('success', 'Product updated successfully.');
     }
@@ -290,11 +299,27 @@ class ProductController extends Controller
             'product_type' => 'nullable|string|in:standard,apparel,building_material,liquid,electronics,digital',
         ]);
 
-        if ($product->has_variants && isset($validated['stock_quantity'])) {
-            unset($validated['stock_quantity']);
-        }
-
+        $prevStock = (int) $product->stock_quantity;
         $product->update(array_filter($validated, fn ($val) => ! is_null($val)));
+
+        if (! $product->has_variants && isset($validated['stock_quantity'])) {
+            $newStock = (int) $validated['stock_quantity'];
+            $delta = $newStock - $prevStock;
+            if ($delta !== 0) {
+                InventoryTransaction::create([
+                    'product_id' => $product->id,
+                    'product_variant_id' => null,
+                    'user_id' => Auth::id(),
+                    'type' => $delta > 0 ? 'in' : 'out',
+                    'quantity_change' => $delta,
+                    'previous_stock' => $prevStock,
+                    'new_stock' => $newStock,
+                    'reason' => 'physical_count',
+                    'reference_number' => 'QUICK-UPDATE',
+                    'notes' => "Stock adjusted via quick update from {$prevStock} to {$newStock}",
+                ]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Product updated.');
     }
@@ -309,7 +334,19 @@ class ProductController extends Controller
             return redirect()->back()->with('error', 'Cannot delete a product with pending or processing orders. Please archive or draft it instead.');
         }
 
+        $primaryImg = $product->primary_image;
+        $galleryImgs = $product->images()->pluck('image_path')->all();
+
         $product->delete();
+
+        foreach (array_merge([$primaryImg], $galleryImgs) as $imgUrl) {
+            if ($imgUrl) {
+                $path = str_replace('/storage/', '', parse_url($imgUrl, PHP_URL_PATH) ?? $imgUrl);
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
     }

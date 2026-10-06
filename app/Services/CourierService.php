@@ -143,11 +143,11 @@ class CourierService
                     'message' => $err,
                 ];
             } catch (\Exception $e) {
-                Log::error("Steadfast API exception: {$e->getMessage()}");
+                Log::error("Steadfast API exception: {$e->getMessage()}", ['exception' => $e]);
 
                 return [
                     'success' => false,
-                    'message' => "Steadfast Courier API error: {$e->getMessage()}",
+                    'message' => 'Unable to connect to Steadfast Courier. Please verify credentials in Settings or try again.',
                 ];
             }
         }
@@ -228,9 +228,11 @@ class CourierService
                     'message' => $response->json()['message'] ?? 'Pathao Courier API rejected order.',
                 ];
             } catch (\Exception $e) {
+                Log::error("Pathao API exception: {$e->getMessage()}", ['exception' => $e]);
+
                 return [
                     'success' => false,
-                    'message' => "Pathao Courier exception: {$e->getMessage()}",
+                    'message' => 'Unable to connect to Pathao Courier. Please verify credentials in Settings or try again.',
                 ];
             }
         }

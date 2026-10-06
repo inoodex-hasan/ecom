@@ -173,18 +173,16 @@ class InventoryController extends Controller
     {
         $fileName = 'inventory-report-'.now()->format('Y-m-d').'.csv';
 
-        $products = Product::with(['category', 'variants'])->get();
-
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
         ];
 
-        return response()->stream(function () use ($products) {
+        return response()->stream(function () {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Product Name', 'SKU', 'Variant Details', 'Category', 'Unit', 'Current Stock', 'Low Stock Threshold', 'Stock Status', 'Unit Price']);
 
-            foreach ($products as $product) {
+            Product::with(['category', 'variants'])->cursor()->each(function ($product) use ($handle) {
                 if ($product->has_variants && $product->variants->isNotEmpty()) {
                     foreach ($product->variants as $variant) {
                         $variantOptions = is_array($variant->option_values)
@@ -220,7 +218,7 @@ class InventoryController extends Controller
                         $product->price,
                     ]);
                 }
-            }
+            });
 
             fclose($handle);
         }, 200, $headers);

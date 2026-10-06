@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Coupon;
 use App\Models\CouponUsage;
+use Illuminate\Support\Facades\DB;
 
 class CouponService
 {
@@ -196,16 +197,18 @@ class CouponService
         ?int $customerId = null,
         ?int $orderId = null
     ): CouponUsage {
-        $usage = CouponUsage::create([
-            'coupon_id' => $coupon->id,
-            'customer_id' => $customerId,
-            'order_id' => $orderId,
-            'discount_amount' => $discountAmount,
-            'used_at' => now(),
-        ]);
+        return DB::transaction(function () use ($coupon, $discountAmount, $customerId, $orderId) {
+            $usage = CouponUsage::create([
+                'coupon_id' => $coupon->id,
+                'customer_id' => $customerId,
+                'order_id' => $orderId,
+                'discount_amount' => $discountAmount,
+                'used_at' => now(),
+            ]);
 
-        $coupon->increment('total_used');
+            $coupon->increment('total_used');
 
-        return $usage;
+            return $usage;
+        });
     }
 }

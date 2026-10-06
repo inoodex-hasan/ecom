@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FraudBlacklist;
+use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Services\FraudCheckService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,12 +27,22 @@ class FraudController extends Controller
         $statusFilter = $request->input('status', 'all');
         $search = $request->input('search');
 
-        // 1. High-level Fraud Dashboard Metrics
-        $totalScreened = Order::whereNotNull('fraud_checked_at')->count();
-        $highRiskCount = Order::where('fraud_risk_level', 'high')->count();
-        $mediumRiskCount = Order::where('fraud_risk_level', 'medium')->count();
-        $lowRiskCount = Order::where('fraud_risk_level', 'low')->count();
-        $blockedCount = Order::where('fraud_status', 'blocked')->count();
+        // 1. High-level Fraud Dashboard Metrics (Single consolidated aggregation query)
+        $rawCounts = Order::toBase()
+            ->selectRaw("
+                COUNT(fraud_checked_at) as total_screened,
+                SUM(CASE WHEN fraud_risk_level = 'high' THEN 1 ELSE 0 END) as high_risk,
+                SUM(CASE WHEN fraud_risk_level = 'medium' THEN 1 ELSE 0 END) as medium_risk,
+                SUM(CASE WHEN fraud_risk_level = 'low' THEN 1 ELSE 0 END) as low_risk,
+                SUM(CASE WHEN fraud_status = 'blocked' THEN 1 ELSE 0 END) as blocked
+            ")
+            ->first();
+
+        $totalScreened = (int) ($rawCounts->total_screened ?? 0);
+        $highRiskCount = (int) ($rawCounts->high_risk ?? 0);
+        $mediumRiskCount = (int) ($rawCounts->medium_risk ?? 0);
+        $lowRiskCount = (int) ($rawCounts->low_risk ?? 0);
+        $blockedCount = (int) ($rawCounts->blocked ?? 0);
 
         // Estimated delivery courier loss prevented (assuming ৳120 return delivery fee per prevented fake order)
         $estimatedSavedBdt = $blockedCount * 120;
@@ -191,26 +203,76 @@ class FraudController extends Controller
     {
         $reason = $request->input('reason') ?? 'Flagged as high-risk fraudulent order.';
         $addToBlacklist = $request->has('add_to_blacklist') ? $request->boolean('add_to_blacklist') : true;
+        $wasAlreadyCancelled = $order->status === 'cancelled';
 
-        $order->update([
-            'status' => 'cancelled',
-            'fraud_status' => 'blocked',
-            'fraud_notes' => $reason,
-        ]);
+        DB::transaction(function () use ($request, $order, $reason, $addToBlacklist, $wasAlreadyCancelled) {
+            $order->update([
+                'status' => 'cancelled',
+                'fraud_status' => 'blocked',
+                'fraud_notes' => $reason,
+            ]);
 
-        $phone = $order->shipping_address['phone'] ?? $order->customer?->phone ?? null;
-        $normalizedPhone = $this->fraudService->normalizeBdPhone($phone);
+            // Restore inventory and write audit log if order was not already cancelled
+            if (! $wasAlreadyCancelled) {
+                foreach ($order->items()->with(['product', 'variant'])->get() as $item) {
+                    $product = $item->product;
+                    $variant = $item->variant;
 
-        if ($addToBlacklist && $normalizedPhone) {
-            FraudBlacklist::updateOrCreate(
-                ['type' => 'phone', 'value' => $normalizedPhone],
-                [
-                    'list_type' => 'blacklist',
-                    'reason' => $reason,
-                    'created_by' => $request->user()?->id,
-                ]
-            );
-        }
+                    if ($variant) {
+                        $prevStock = (int) $variant->stock_quantity;
+                        $newStock = $prevStock + (int) $item->quantity;
+                        $variant->update(['stock_quantity' => $newStock]);
+                        $product?->update(['stock_quantity' => (int) $product->variants()->sum('stock_quantity')]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $item->product_id,
+                            'product_variant_id' => $variant->id,
+                            'user_id' => $request->user()?->id,
+                            'type' => 'in',
+                            'quantity_change' => (int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'customer_return',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Restocked on fraud block of order #{$order->order_number}",
+                        ]);
+                    } elseif ($product) {
+                        $prevStock = (int) $product->stock_quantity;
+                        $newStock = $prevStock + (int) $item->quantity;
+                        $product->update(['stock_quantity' => $newStock]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $product->id,
+                            'product_variant_id' => null,
+                            'user_id' => $request->user()?->id,
+                            'type' => 'in',
+                            'quantity_change' => (int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'customer_return',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Restocked on fraud block of order #{$order->order_number}",
+                        ]);
+                    }
+                }
+
+                $order->customer?->recalculateTotals();
+            }
+
+            $phone = $order->shipping_address['phone'] ?? $order->customer?->phone ?? null;
+            $normalizedPhone = $this->fraudService->normalizeBdPhone($phone);
+
+            if ($addToBlacklist && $normalizedPhone) {
+                FraudBlacklist::updateOrCreate(
+                    ['type' => 'phone', 'value' => $normalizedPhone],
+                    [
+                        'list_type' => 'blacklist',
+                        'reason' => $reason,
+                        'created_by' => $request->user()?->id,
+                    ]
+                );
+            }
+        });
 
         return redirect()->back()->with('success', "Order #{$order->order_number} cancelled and flagged as blocked.");
     }

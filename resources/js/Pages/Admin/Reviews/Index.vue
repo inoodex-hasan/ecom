@@ -26,9 +26,14 @@ import {
 } from 'lucide-vue-next';
 
 const props = defineProps({
-    reviews: Array,
+    reviews: [Array, Object],
     metrics: Object,
     filters: Object,
+});
+
+const reviewList = computed(() => {
+    if (Array.isArray(props.reviews)) return props.reviews;
+    return props.reviews?.data || [];
 });
 
 // Filter State
@@ -321,9 +326,9 @@ function getStarPercent(count) {
             </div>
 
             <!-- Review Cards Feed -->
-            <div v-if="reviews.length > 0" class="space-y-3">
+            <div v-if="reviewList.length > 0" class="space-y-3">
                 <div
-                    v-for="review in reviews"
+                    v-for="review in reviewList"
                     :key="review.id"
                     class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs transition-all hover:border-slate-300 dark:hover:border-slate-700 space-y-2.5"
                 >

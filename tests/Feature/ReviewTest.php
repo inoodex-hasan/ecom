@@ -67,7 +67,7 @@ class ReviewTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
             ->component('Admin/Reviews/Index')
-            ->has('reviews', 1)
+            ->has('reviews.data', 1)
             ->has('metrics')
             ->where('metrics.total_reviews', 1)
             ->where('metrics.pending_count', 1)

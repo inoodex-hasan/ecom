@@ -61,11 +61,11 @@ class FlashSaleTest extends TestCase
             'quantity_sold' => 5,
         ]);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.flash-sales.index'));
+        $response = $this->actingAs($this->admin)->get(route('admin.campaigns.index'));
 
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
-            ->component('Admin/FlashSales/Index')
+            ->component('Admin/Campaigns/Index')
             ->has('flashSales', 1)
             ->has('metrics')
             ->where('metrics.total_campaigns', 1)
@@ -73,9 +73,15 @@ class FlashSaleTest extends TestCase
         );
     }
 
+    public function test_legacy_flash_sales_route_redirects_to_campaigns(): void
+    {
+        $response = $this->actingAs($this->admin)->get(route('admin.flash-sales.index'));
+        $response->assertRedirect(route('admin.campaigns.index'));
+    }
+
     public function test_unauthorized_user_cannot_access_flash_sales(): void
     {
-        $response = $this->actingAs($this->regularUser)->get(route('admin.flash-sales.index'));
+        $response = $this->actingAs($this->regularUser)->get(route('admin.campaigns.index'));
         $response->assertStatus(403);
     }
 
@@ -97,10 +103,10 @@ class FlashSaleTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->from(route('admin.flash-sales.index'))
-            ->post(route('admin.flash-sales.store'), $payload);
+            ->from(route('admin.campaigns.index'))
+            ->post(route('admin.campaigns.store'), $payload);
 
-        $response->assertRedirect(route('admin.flash-sales.index'));
+        $response->assertRedirect(route('admin.campaigns.index'));
         $this->assertDatabaseHas('flash_sales', [
             'title' => 'Super 10.10 Flash Carnival',
             'is_active' => true,
@@ -123,8 +129,8 @@ class FlashSaleTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->from(route('admin.flash-sales.index'))
-            ->put(route('admin.flash-sales.update', $sale), [
+            ->from(route('admin.campaigns.index'))
+            ->put(route('admin.campaigns.update', $sale), [
                 'title' => 'Renamed Flash Campaign',
                 'description' => 'Updated terms',
                 'starts_at' => now()->format('Y-m-d H:i:s'),
@@ -139,7 +145,7 @@ class FlashSaleTest extends TestCase
                 ],
             ]);
 
-        $response->assertRedirect(route('admin.flash-sales.index'));
+        $response->assertRedirect(route('admin.campaigns.index'));
         $this->assertDatabaseHas('flash_sales', [
             'id' => $sale->id,
             'title' => 'Renamed Flash Campaign',
@@ -162,10 +168,10 @@ class FlashSaleTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->from(route('admin.flash-sales.index'))
-            ->patch(route('admin.flash-sales.toggle-status', $sale));
+            ->from(route('admin.campaigns.index'))
+            ->patch(route('admin.campaigns.toggle-status', $sale));
 
-        $response->assertRedirect(route('admin.flash-sales.index'));
+        $response->assertRedirect(route('admin.campaigns.index'));
         $this->assertDatabaseHas('flash_sales', [
             'id' => $sale->id,
             'is_active' => false,
@@ -189,10 +195,10 @@ class FlashSaleTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->from(route('admin.flash-sales.index'))
-            ->delete(route('admin.flash-sales.destroy', $sale));
+            ->from(route('admin.campaigns.index'))
+            ->delete(route('admin.campaigns.destroy', $sale));
 
-        $response->assertRedirect(route('admin.flash-sales.index'));
+        $response->assertRedirect(route('admin.campaigns.index'));
         $this->assertDatabaseMissing('flash_sales', ['id' => $sale->id]);
         $this->assertDatabaseMissing('flash_sale_items', ['flash_sale_id' => $sale->id]);
     }

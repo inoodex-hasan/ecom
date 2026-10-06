@@ -85,14 +85,14 @@ watchEffect(() => {
 });
 
 const allNavItems = [
-    { name: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard },
+    { name: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
     { name: 'Products', route: 'admin.products.index', icon: ShoppingBag, permission: 'products.view' },
     { name: 'Inventory', route: 'admin.inventory.index', icon: Boxes, permission: 'inventory.view' },
     { name: 'Orders', route: 'admin.orders.index', icon: ShoppingCart, permission: 'orders.view' },
     { name: 'Fraud Shield', route: 'admin.fraud.index', icon: ShieldAlert, permission: 'fraud.view' },
     { name: 'Categories', route: 'admin.categories.index', icon: FolderTree, permission: 'categories.view' },
     { name: 'Banners', route: 'admin.banners.index', icon: Image, permission: 'banners.view' },
-    { name: 'Flash Sales', route: 'admin.flash-sales.index', icon: Zap, permission: 'promotions.view' },
+    { name: 'Campaigns', route: 'admin.campaigns.index', icon: Zap, permission: 'promotions.view' },
     { name: 'Coupons', route: 'admin.coupons.index', icon: Ticket, permission: 'coupons.view' },
     { name: 'Reviews', route: 'admin.reviews.index', icon: Star, permission: 'reviews.view' },
     { name: 'Customers', route: 'admin.customers.index', icon: Users, permission: 'customers.view' },

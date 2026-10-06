@@ -57,27 +57,33 @@ class DashboardController extends Controller
             return $item;
         });
 
-        // 12-Month Sales History (single query for all 12 months)
+        // 12-Month Sales History (single SQL aggregation query)
         $historyStartDate = Carbon::now()->subMonths(11)->startOfMonth();
-        $recentHistoryOrders = Order::toBase()
-            ->where('created_at', '>=', $historyStartDate)
-            ->select('created_at', 'payment_status', 'total')
-            ->get()
-            ->groupBy(fn ($row) => Carbon::parse($row->created_at)->format('Y-m'));
+        $dateExpr = DB::getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m')";
 
-        $months = collect(range(11, 0))->map(function ($i) use ($recentHistoryOrders) {
+        $monthlyAggregates = Order::toBase()
+            ->where('created_at', '>=', $historyStartDate)
+            ->selectRaw("
+                {$dateExpr} as period,
+                COUNT(*) as orders_count,
+                SUM(CASE WHEN payment_status = 'paid' THEN total ELSE 0 END) as revenue
+            ")
+            ->groupBy('period')
+            ->get()
+            ->keyBy('period');
+
+        $months = collect(range(11, 0))->map(function ($i) use ($monthlyAggregates) {
             $date = Carbon::now()->subMonths($i);
             $key = $date->format('Y-m');
-            $monthOrders = $recentHistoryOrders->get($key, collect());
-
-            $revenue = (float) $monthOrders->where('payment_status', 'paid')->sum('total');
-            $ordersCount = $monthOrders->count();
+            $stat = $monthlyAggregates->get($key);
 
             return [
                 'month' => $date->format('M'),
                 'full_month' => $date->format('M Y'),
-                'revenue' => $revenue,
-                'orders' => $ordersCount,
+                'revenue' => (float) ($stat->revenue ?? 0.0),
+                'orders' => (int) ($stat->orders_count ?? 0),
             ];
         });
 

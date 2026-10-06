@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\OrdersExport;
 use App\Http\Controllers\Controller;
+use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -112,8 +115,54 @@ class OrderController extends Controller
             if ($newStatus === 'cancelled' && $oldStatus !== 'cancelled') {
                 $order->loadMissing('items');
                 foreach ($order->items as $item) {
-                    if ($item->product_id) {
-                        Product::where('id', $item->product_id)->increment('stock_quantity', $item->quantity);
+                    if (! $item->product_id) {
+                        continue;
+                    }
+
+                    $product = Product::find($item->product_id);
+                    if (! $product) {
+                        continue;
+                    }
+
+                    $variant = $product->has_variants && $item->sku
+                        ? ProductVariant::where('product_id', $product->id)->where('sku', $item->sku)->first()
+                        : null;
+
+                    if ($variant) {
+                        $prevStock = (int) $variant->stock_quantity;
+                        $newStock = $prevStock + (int) $item->quantity;
+                        $variant->update(['stock_quantity' => $newStock]);
+                        $product->update(['stock_quantity' => (int) $product->variants()->sum('stock_quantity')]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $product->id,
+                            'product_variant_id' => $variant->id,
+                            'user_id' => Auth::id(),
+                            'type' => 'in',
+                            'quantity_change' => (int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'customer_return',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Restocked on cancellation of order #{$order->order_number}",
+                        ]);
+                    } else {
+                        $prevStock = (int) $product->stock_quantity;
+                        $newStock = $prevStock + (int) $item->quantity;
+                        $product->update(['stock_quantity' => $newStock]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $product->id,
+                            'product_variant_id' => null,
+                            'user_id' => Auth::id(),
+                            'type' => 'in',
+                            'quantity_change' => (int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'customer_return',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Restocked on cancellation of order #{$order->order_number}",
+                        ]);
                     }
                 }
             }
@@ -122,8 +171,54 @@ class OrderController extends Controller
             if ($oldStatus === 'cancelled' && $newStatus !== 'cancelled') {
                 $order->loadMissing('items');
                 foreach ($order->items as $item) {
-                    if ($item->product_id) {
-                        Product::where('id', $item->product_id)->decrement('stock_quantity', $item->quantity);
+                    if (! $item->product_id) {
+                        continue;
+                    }
+
+                    $product = Product::find($item->product_id);
+                    if (! $product) {
+                        continue;
+                    }
+
+                    $variant = $product->has_variants && $item->sku
+                        ? ProductVariant::where('product_id', $product->id)->where('sku', $item->sku)->first()
+                        : null;
+
+                    if ($variant) {
+                        $prevStock = (int) $variant->stock_quantity;
+                        $newStock = max(0, $prevStock - (int) $item->quantity);
+                        $variant->update(['stock_quantity' => $newStock]);
+                        $product->update(['stock_quantity' => (int) $product->variants()->sum('stock_quantity')]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $product->id,
+                            'product_variant_id' => $variant->id,
+                            'user_id' => Auth::id(),
+                            'type' => 'out',
+                            'quantity_change' => -(int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'order_fulfillment',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Re-deducted on reactivation of order #{$order->order_number}",
+                        ]);
+                    } else {
+                        $prevStock = (int) $product->stock_quantity;
+                        $newStock = max(0, $prevStock - (int) $item->quantity);
+                        $product->update(['stock_quantity' => $newStock]);
+
+                        InventoryTransaction::create([
+                            'product_id' => $product->id,
+                            'product_variant_id' => null,
+                            'user_id' => Auth::id(),
+                            'type' => 'out',
+                            'quantity_change' => -(int) $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock' => $newStock,
+                            'reason' => 'order_fulfillment',
+                            'reference_number' => $order->order_number,
+                            'notes' => "Re-deducted on reactivation of order #{$order->order_number}",
+                        ]);
                     }
                 }
             }
