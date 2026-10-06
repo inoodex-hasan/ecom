@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BannerController;
+use App\Http\Controllers\Admin\BlogController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CourierController;
@@ -122,6 +123,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::patch('/reviews/{review}/status', [ReviewController::class, 'updateStatus'])->name('reviews.update-status')->middleware('can:reviews.manage');
     Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])->name('reviews.reply')->middleware('can:reviews.manage');
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy')->middleware('can:reviews.manage');
+
+    // Blog & Editorial Articles Management
+    Route::get('/blogs', [BlogController::class, 'index'])->name('blogs.index')->middleware('can:blogs.view');
+    Route::post('/blogs', [BlogController::class, 'store'])->name('blogs.store')->middleware('can:blogs.manage');
+    Route::post('/blogs/upload-cover', [BlogController::class, 'uploadCover'])->name('blogs.upload-cover')->middleware('can:blogs.manage');
+    Route::put('/blogs/{blogPost}', [BlogController::class, 'update'])->name('blogs.update')->middleware('can:blogs.manage');
+    Route::patch('/blogs/{blogPost}/toggle-status', [BlogController::class, 'toggleStatus'])->name('blogs.toggle-status')->middleware('can:blogs.manage');
+    Route::delete('/blogs/{blogPost}', [BlogController::class, 'destroy'])->name('blogs.destroy')->middleware('can:blogs.manage');
 
     // Customers Management
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index')->middleware('can:customers.view');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BlogPost;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Order;
@@ -25,6 +26,8 @@ class DashboardController extends Controller
         $totalCustomers = Customer::count();
         $totalProducts = Product::count();
         $lowStockCount = Product::lowStock()->count();
+        $blogCount = BlogPost::count();
+        $publishedBlogCount = BlogPost::where('is_published', true)->count();
 
         $avgOrderValue = $paidOrdersCount > 0 ? round($totalRevenue / $paidOrdersCount, 2) : 0.00;
         $fulfilledOrdersCount = Order::whereIn('status', ['delivered', 'shipped'])->count();
@@ -119,6 +122,8 @@ class DashboardController extends Controller
                 'low_stock_count' => $lowStockCount,
                 'avg_order_value' => $avgOrderValue,
                 'fulfillment_rate' => $fulfillmentRate,
+                'blog_count' => $blogCount,
+                'published_blog_count' => $publishedBlogCount,
             ],
             'recentOrders' => $recentOrders,
             'lowStockProducts' => $lowStockProducts,

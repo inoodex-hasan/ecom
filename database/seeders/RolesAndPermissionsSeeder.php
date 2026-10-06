@@ -76,6 +76,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // Fraud Shield & Risk Control
             'fraud.view',
             'fraud.manage',
+
+            // Blogs & Articles
+            'blogs.view',
+            'blogs.manage',
         ];
 
         foreach ($permissions as $permission) {
@@ -101,6 +105,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.view', 'customers.edit',
             'settings.view',
             'fraud.view', 'fraud.manage',
+            'blogs.view', 'blogs.manage',
         ]);
 
         // 3. Fulfillment Staff Role

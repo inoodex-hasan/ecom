@@ -21,6 +21,7 @@ import {
     Eye,
     LayoutGrid,
     List,
+    Newspaper,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -269,6 +270,12 @@ const statRows = computed(() => [
                     >
                         <ShoppingCart class="w-3.5 h-3.5 text-slate-400" /> View Orders
                     </Link>
+                    <Link
+                        :href="route('admin.blogs.index')"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
+                    >
+                        <Newspaper class="w-3.5 h-3.5 text-slate-400" /> Blogs & Stories
+                    </Link>
                 </div>
             </div>
 
@@ -350,6 +357,27 @@ const statRows = computed(() => [
                             <p class="text-2xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">{{ formatNumber(metrics?.total_products) }}</p>
                             <Link :href="route('admin.products.index')" class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline mt-1.5 inline-block">Manage inventory →</Link>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Editorial & Blog Quick Strip -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent border border-indigo-500/20">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <Newspaper class="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-slate-900 dark:text-white">Storefront Blog & Editorial Engine</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ metrics?.published_blog_count || 0 }}</span> published articles live on Next.js storefront · 
+                                <span class="font-bold text-slate-600 dark:text-slate-300">{{ Math.max(0, (metrics?.blog_count || 0) - (metrics?.published_blog_count || 0)) }}</span> draft in progress
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Link :href="route('admin.blogs.index')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors">
+                            Manage Articles <ChevronRight class="w-3.5 h-3.5" />
+                        </Link>
                     </div>
                 </div>
 

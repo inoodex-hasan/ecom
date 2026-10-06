@@ -36,6 +36,7 @@ import {
     Zap
 } from 'lucide-vue-next';
 import CustomSelect from '@/Components/CustomSelect.vue';
+import RichTextEditor from '@/Components/RichTextEditor.vue';
 
 const props = defineProps({
     products: Object,
@@ -1115,15 +1116,17 @@ const formatCurrency = (val) => {
                             </div>
                         </div>
 
-                        <!-- Description -->
+                        <!-- Description (Rich Text Editor) -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Product Description</label>
-                            <textarea
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Product Description</label>
+                                <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">Rich Text (Tiptap)</span>
+                            </div>
+                            <RichTextEditor
                                 v-model="form.description"
-                                rows="3"
-                                placeholder="Enter detailed product description..."
-                                class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
-                            ></textarea>
+                                placeholder="Enter detailed product description, specifications, and highlights..."
+                                min-height="160px"
+                            />
                         </div>
                     </div>
 

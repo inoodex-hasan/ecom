@@ -41,6 +41,7 @@ import {
     Zap,
     Ticket,
     Star,
+    Newspaper,
     LayoutGrid,
     Sliders,
     ArrowRight
@@ -410,6 +411,18 @@ const permissionMeta = {
         type: 'write',
     },
 
+    // Blogs & Editorial Articles
+    'blogs.view': {
+        title: 'View Blog Articles',
+        description: 'Browse editorial articles, draft stories, and reader statistics',
+        type: 'read',
+    },
+    'blogs.manage': {
+        title: 'Manage Blog Articles',
+        description: 'Create, write, publish, and delete blog posts and upload cover media',
+        type: 'write',
+    },
+
     // Customers
     'customers.view': {
         title: 'View Customers',
@@ -499,6 +512,11 @@ const moduleMeta = {
         title: 'Customer Reviews & Ratings',
         description: 'Customer ratings, photo testimonials, moderation, and feedback replies',
         icon: Star,
+    },
+    blogs: {
+        title: 'Blogs & Articles',
+        description: 'Store news, editorial stories, trend guides, and promotional articles',
+        icon: Newspaper,
     },
     customers: {
         title: 'Customer Directory',

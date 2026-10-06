@@ -24,7 +24,8 @@ import {
     Image,
     Zap,
     Ticket,
-    Star
+    Star,
+    Newspaper
 } from 'lucide-vue-next';
 
 const page = usePage();
@@ -95,6 +96,7 @@ const allNavItems = [
     { name: 'Campaigns', route: 'admin.campaigns.index', icon: Zap, permission: 'promotions.view' },
     { name: 'Coupons', route: 'admin.coupons.index', icon: Ticket, permission: 'coupons.view' },
     { name: 'Reviews', route: 'admin.reviews.index', icon: Star, permission: 'reviews.view' },
+    { name: 'Blogs & Articles', route: 'admin.blogs.index', icon: Newspaper, permission: 'blogs.view' },
     { name: 'Customers', route: 'admin.customers.index', icon: Users, permission: 'customers.view' },
     { name: 'Staff & Roles', route: 'admin.staff.index', icon: ShieldCheck, permission: 'staff.view' },
     { name: 'Settings', route: 'admin.settings.index', icon: Settings, permission: 'settings.view' },
