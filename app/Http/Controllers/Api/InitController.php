@@ -58,22 +58,22 @@ class InitController extends Controller
             ->where(function ($q) use ($now) {
                 $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
             })
-            ->orderBy('order')
-            ->get(['id', 'title', 'subtitle', 'image_url', 'mobile_image_url', 'link_url', 'button_text', 'text_color', 'text_alignment']);
+            ->orderBy('sort_order')
+            ->get(['id', 'title', 'subtitle', 'badge_text', 'image_url', 'mobile_image_url', 'link_url', 'button_text', 'placement']);
 
         // 2. Featured / Root Categories
         $categories = Category::where('is_active', true)
             ->whereNull('parent_id')
-            ->orderBy('order')
+            ->orderBy('sort_order')
             ->withCount(['products' => fn ($q) => $q->where('status', 'published')])
-            ->get(['id', 'name', 'slug', 'image_url', 'description']);
+            ->get(['id', 'name', 'slug', 'image', 'icon', 'description']);
 
         // 3. Active Running Campaigns with live countdown
         $activeCampaigns = FlashSale::where('is_active', true)
             ->where('starts_at', '<=', $now)
             ->where('ends_at', '>=', $now)
             ->with(['items.product' => function ($q) {
-                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count');
+                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count');
             }])
             ->get(['id', 'title', 'slug', 'banner_image', 'description', 'starts_at', 'ends_at']);
 
@@ -82,25 +82,25 @@ class InitController extends Controller
             ->where('is_hot', true)
             ->latest()
             ->take(8)
-            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label', 'stock_quantity']);
+            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label', 'stock_quantity']);
 
         $trendingProducts = Product::where('status', 'published')
             ->where('is_trending', true)
             ->latest()
             ->take(8)
-            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label', 'stock_quantity']);
+            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label', 'stock_quantity']);
 
         $newArrivals = Product::where('status', 'published')
             ->where('is_new_arrival', true)
             ->latest()
             ->take(8)
-            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label', 'stock_quantity']);
+            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label', 'stock_quantity']);
 
         // Fallback featured products if no badges set
         $featuredProducts = Product::where('status', 'published')
             ->latest()
             ->take(8)
-            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label', 'stock_quantity']);
+            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label', 'stock_quantity']);
 
         // 5. Recent Blog Articles
         $recentBlogs = BlogPost::published()

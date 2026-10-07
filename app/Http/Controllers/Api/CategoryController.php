@@ -15,7 +15,7 @@ class CategoryController extends Controller
     {
         $categories = Category::where('is_active', true)
             ->whereNull('parent_id')
-            ->orderBy('order')
+            ->orderBy('sort_order')
             ->with(['children' => function ($q) {
                 $q->where('is_active', true)->withCount(['products' => fn ($p) => $p->where('status', 'published')]);
             }])

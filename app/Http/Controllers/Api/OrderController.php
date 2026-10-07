@@ -28,41 +28,121 @@ class OrderController extends Controller
      */
     public function checkout(Request $request): JsonResponse
     {
+        // 0. Pre-normalize frontend parameters for seamless compatibility
+        $input = $request->all();
+
+        // Map full name -> first_name & last_name
+        if (! empty($input['name']) && empty($input['first_name'])) {
+            $nameParts = explode(' ', trim($input['name']), 2);
+            $input['first_name'] = $nameParts[0] ?: 'Customer';
+            $input['last_name'] = $nameParts[1] ?? '';
+        }
+
+        // Map address -> address_line_1
+        if (! empty($input['address']) && empty($input['address_line_1'])) {
+            $input['address_line_1'] = $input['address'];
+        }
+
+        // Map postcode -> postal_code
+        if (! empty($input['postcode']) && empty($input['postal_code'])) {
+            $input['postal_code'] = $input['postcode'];
+        }
+
+        // Map payment -> payment_method
+        if (! empty($input['payment']) && empty($input['payment_method'])) {
+            $input['payment_method'] = $input['payment'];
+        }
+
+        // Map wallet -> sender_number
+        if (! empty($input['wallet']) && empty($input['sender_number'])) {
+            $input['sender_number'] = $input['wallet'];
+        }
+
+        // Map trxid / transaction_id -> trx
+        if (! empty($input['trxid']) && empty($input['trx'])) {
+            $input['trx'] = $input['trxid'];
+        } elseif (! empty($input['transaction_id']) && empty($input['trx'])) {
+            $input['trx'] = $input['transaction_id'];
+        }
+
+        // Map items.*.id -> items.*.product_id & items.*.qty -> items.*.quantity
+        if (! empty($input['items']) && is_array($input['items'])) {
+            foreach ($input['items'] as $idx => $item) {
+                if (is_array($item)) {
+                    if (! empty($item['id']) && empty($item['product_id'])) {
+                        $numericId = preg_replace('/\D/', '', (string) $item['id']);
+                        $input['items'][$idx]['product_id'] = $numericId !== '' ? (int) $numericId : $item['id'];
+                    }
+                    if (! empty($item['qty']) && empty($item['quantity'])) {
+                        $input['items'][$idx]['quantity'] = (int) $item['qty'];
+                    }
+                }
+            }
+        }
+
+        $request->merge($input);
+
         $validated = $request->validate([
-            'first_name' => 'required|string|max:100',
+            'first_name' => 'required_without:name|nullable|string|max:100',
             'last_name' => 'nullable|string|max:100',
-            'email' => 'required|email|max:150',
+            'name' => 'nullable|string|max:200',
+            'email' => 'nullable|email|max:150',
             'phone' => 'required|string|max:30',
-            'address_line_1' => 'required|string|max:255',
+            'address_line_1' => 'required_without:address|nullable|string|max:255',
             'address_line_2' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:255',
             'city' => 'required|string|max:100',
+            'area' => 'nullable|string|max:100',
             'postal_code' => 'nullable|string|max:20',
+            'postcode' => 'nullable|string|max:20',
             'country' => 'nullable|string|max:100',
-            'payment_method' => 'nullable|string|in:cod,bkash,nagad,card,bank',
+            'payment_method' => 'nullable|string|in:cod,bkash,nagad,rocket,card,bank,online',
+            'sender_number' => 'nullable|string|max:30',
+            'trx' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:1000',
             'coupon_code' => 'nullable|string|max:50',
+            'delivery_charge' => 'nullable|numeric|min:0',
+            'shipping_cost' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.variant_id' => 'nullable|integer',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            // 1. Find or create Customer
-            $customer = Customer::firstOrCreate(
-                ['email' => $validated['email']],
-                [
-                    'first_name' => $validated['first_name'],
+        return DB::transaction(function () use ($validated, $request) {
+            // 1. Resolve or create Customer (by email if provided, by phone, or create guest)
+            $cleanPhone = preg_replace('/\D/', '', $validated['phone']);
+            $email = ! empty($validated['email'])
+                ? $validated['email']
+                : "guest_{$cleanPhone}@ecom.local";
+
+            $customer = null;
+            if (! empty($validated['email'])) {
+                $customer = Customer::where('email', $validated['email'])->first();
+            }
+            if (! $customer && ! empty($validated['phone'])) {
+                $customer = Customer::where('phone', $validated['phone'])->first();
+            }
+
+            if (! $customer) {
+                $customer = Customer::create([
+                    'first_name' => $validated['first_name'] ?: 'Customer',
                     'last_name' => $validated['last_name'] ?? '',
+                    'email' => $email,
                     'phone' => $validated['phone'],
                     'address_line_1' => $validated['address_line_1'],
-                    'address_line_2' => $validated['address_line_2'] ?? null,
+                    'address_line_2' => $validated['address_line_2'] ?? $request->input('area'),
                     'city' => $validated['city'],
                     'postal_code' => $validated['postal_code'] ?? null,
                     'country' => $validated['country'] ?? 'Bangladesh',
                     'status' => 'active',
-                ]
-            );
+                ]);
+            } else {
+                $customer->update(array_filter([
+                    'address_line_1' => $customer->address_line_1 ?: $validated['address_line_1'],
+                    'city' => $customer->city ?: $validated['city'],
+                ]));
+            }
 
             // 2. Validate product stock and calculate subtotal
             $subtotal = 0;
@@ -146,16 +226,20 @@ class OrderController extends Controller
             }
 
             // 4. Shipping Calculation
-            $freeThreshold = (float) Setting::get('shipping.free_shipping_threshold', 100);
-            $defaultShipping = (float) Setting::get('shipping.default_fee', 10);
-            $shippingCost = ($freeShipping || $subtotal >= $freeThreshold) ? 0.0 : $defaultShipping;
+            if ($request->has('delivery_charge') || $request->has('shipping_cost')) {
+                $shippingCost = max(0, (float) $request->input('delivery_charge', $request->input('shipping_cost')));
+            } else {
+                $freeThreshold = (float) Setting::get('free_shipping_threshold', Setting::get('shipping.free_shipping_threshold', 150));
+                $defaultShipping = (float) Setting::get('flat_shipping_rate', Setting::get('shipping.default_fee', 100));
+                $shippingCost = ($freeShipping || $subtotal >= $freeThreshold) ? 0.0 : $defaultShipping;
+            }
 
             // 5. Total
             $total = max(0, ($subtotal - $discount) + $shippingCost);
 
             // 6. Fraud Screening Check
             $isBlacklisted = FraudBlacklist::isBlacklisted('phone', $validated['phone'])
-                || FraudBlacklist::isBlacklisted('email', $validated['email']);
+                || (! empty($validated['email']) && FraudBlacklist::isBlacklisted('email', $validated['email']));
             $fraudRiskLevel = $isBlacklisted ? 'high' : 'low';
             $fraudStatus = $isBlacklisted ? 'suspect' : 'passed';
 
@@ -163,15 +247,26 @@ class OrderController extends Controller
             $orderNumber = 'ORD-'.date('Ymd').'-'.strtoupper(Str::random(4));
 
             $shippingAddress = [
-                'name' => trim("{$validated['first_name']} ".($validated['last_name'] ?? '')),
+                'name' => trim(($validated['first_name'] ?: 'Customer').' '.($validated['last_name'] ?? '')),
                 'phone' => $validated['phone'],
-                'email' => $validated['email'],
+                'email' => $email,
                 'address_line_1' => $validated['address_line_1'],
                 'address_line_2' => $validated['address_line_2'] ?? '',
+                'area' => $request->input('area', ''),
                 'city' => $validated['city'],
                 'postal_code' => $validated['postal_code'] ?? '',
                 'country' => $validated['country'] ?? 'Bangladesh',
+                'delivery_type' => $request->input('delivery', 'home'),
+                'wallet_number' => $validated['sender_number'] ?? null,
+                'trx_id' => $validated['trx'] ?? null,
             ];
+
+            $paymentMethod = $validated['payment_method'] ?? 'cod';
+            $paymentNote = '';
+            if (! empty($validated['sender_number']) || ! empty($validated['trx'])) {
+                $paymentNote = "\n[Payment: Wallet: ".($validated['sender_number'] ?? 'N/A').' | TrxID: '.($validated['trx'] ?? 'N/A').']';
+            }
+            $finalNotes = trim(($validated['notes'] ?? '').$paymentNote) ?: null;
 
             // 8. Create Order
             $order = Order::create([
@@ -179,7 +274,7 @@ class OrderController extends Controller
                 'customer_id' => $customer->id,
                 'status' => 'pending',
                 'payment_status' => 'unpaid',
-                'payment_method' => $validated['payment_method'] ?? 'cod',
+                'payment_method' => $paymentMethod,
                 'subtotal' => $subtotal,
                 'discount' => $discount,
                 'tax' => 0,
@@ -187,10 +282,14 @@ class OrderController extends Controller
                 'total' => $total,
                 'shipping_address' => $shippingAddress,
                 'billing_address' => $shippingAddress,
-                'notes' => $validated['notes'] ?? null,
+                'notes' => $finalNotes,
                 'fraud_risk_level' => $fraudRiskLevel,
                 'fraud_status' => $fraudStatus,
                 'fraud_notes' => $isBlacklisted ? 'Customer contact matched fraud blacklist records.' : null,
+                'advance_payment_method' => in_array($paymentMethod, ['bkash', 'nagad', 'rocket']) ? $paymentMethod : null,
+                'advance_transaction_id' => $validated['trx'] ?? null,
+                'advance_payment_status' => ! empty($validated['trx']) ? 'unverified' : 'none',
+                'courier_cod_amount' => $paymentMethod === 'cod' ? $total : 0.0,
             ]);
 
             // 9. Create Order Items & Decrement Stock

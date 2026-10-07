@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Coupon;
 use App\Models\FlashSale;
 use App\Models\FlashSaleItem;
+use App\Models\Order;
 use App\Models\Page;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -181,6 +182,47 @@ class StorefrontApiTest extends TestCase
         $trackResponse->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.order_number', $orderNumber);
+    }
+
+    public function test_api_guest_checkout_with_simplified_parameters(): void
+    {
+        $payload = [
+            'name' => 'Tanvir Ahmed',
+            'phone' => '01819001122',
+            'address' => 'House 42, Road 11, Banani',
+            'area' => 'Banani',
+            'city' => 'Dhaka',
+            'postcode' => '1213',
+            'delivery' => 'home',
+            'payment' => 'bkash',
+            'wallet' => '01819001122',
+            'trxid' => '9H8B7C6D5E',
+            'delivery_charge' => 60,
+            'items' => [
+                [
+                    'id' => (string) $this->product->id,
+                    'qty' => 1,
+                ],
+            ],
+        ];
+
+        $response = $this->postJson('/api/v1/orders', $payload);
+        $response->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['data' => ['order_number', 'total', 'status']]);
+
+        $orderNumber = $response->json('data.order_number');
+        $order = Order::where('order_number', $orderNumber)->first();
+
+        $this->assertNotNull($order);
+        $this->assertEquals('bkash', $order->payment_method);
+        $this->assertEquals('9H8B7C6D5E', $order->advance_transaction_id);
+        $this->assertEquals('Tanvir Ahmed', $order->shipping_address['name']);
+        $this->assertEquals('House 42, Road 11, Banani', $order->shipping_address['address_line_1']);
+        $this->assertEquals('Banani', $order->shipping_address['area']);
+        $this->assertEquals(60, $order->shipping_cost);
+        $this->assertEquals('01819001122', $order->shipping_address['wallet_number']);
+        $this->assertEquals('9H8B7C6D5E', $order->shipping_address['trx_id']);
     }
 
     public function test_api_pages_and_about_us(): void
