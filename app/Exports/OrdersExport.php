@@ -54,10 +54,10 @@ class OrdersExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             'Payment Status',
             'Payment Method',
             'Items Count',
-            'Subtotal ($)',
-            'Tax ($)',
-            'Shipping ($)',
-            'Total ($)',
+            'Subtotal (৳)',
+            'Tax (৳)',
+            'Shipping (৳)',
+            'Total (৳)',
             'Date Created',
         ];
     }

@@ -268,7 +268,7 @@ function getStatusBadge(status) {
                         </div>
                     </div>
                     <div class="text-2xl font-black text-purple-600 dark:text-purple-400">
-                        ${{ Number(metrics?.total_discount_claimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                        ৳{{ Number(metrics?.total_discount_claimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                     </div>
                     <span class="text-[10px] text-slate-400 font-medium">Customer savings</span>
                 </div>
@@ -392,11 +392,11 @@ function getStatusBadge(status) {
                         <div class="space-y-1.5 py-3 border-y border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
                             <div v-if="coupon.min_spend" class="flex items-center justify-between text-[11px]">
                                 <span class="text-slate-400">Min Order Spend:</span>
-                                <span class="font-bold text-slate-800 dark:text-slate-200">${{ Number(coupon.min_spend).toFixed(2) }}</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200">৳{{ Number(coupon.min_spend).toFixed(2) }}</span>
                             </div>
                             <div v-if="coupon.max_discount && coupon.type === 'percentage'" class="flex items-center justify-between text-[11px]">
                                 <span class="text-slate-400">Max Discount Cap:</span>
-                                <span class="font-bold text-slate-800 dark:text-slate-200">${{ Number(coupon.max_discount).toFixed(2) }}</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200">৳{{ Number(coupon.max_discount).toFixed(2) }}</span>
                             </div>
                             <div v-if="coupon.usage_limit_per_customer" class="flex items-center justify-between text-[11px]">
                                 <span class="text-slate-400">Limit per customer:</span>
@@ -604,7 +604,7 @@ function getStatusBadge(status) {
                                     <span v-if="form.type === 'fixed_cart'" class="w-2 h-2 rounded-full bg-emerald-600"></span>
                                 </div>
                                 <span class="text-xs font-bold">Fixed Cart</span>
-                                <span class="text-[10px] text-slate-500 mt-0.5">e.g. $15.00 flat discount</span>
+                                <span class="text-[10px] text-slate-500 mt-0.5">e.g. ৳150 flat discount</span>
                             </button>
 
                             <button
@@ -631,7 +631,7 @@ function getStatusBadge(status) {
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div v-if="form.type !== 'free_shipping'">
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                {{ form.type === 'percentage' ? 'Discount Percentage (%) *' : 'Discount Amount ($) *' }}
+                                {{ form.type === 'percentage' ? 'Discount Percentage (%) *' : 'Discount Amount (৳) *' }}
                             </label>
                             <input
                                 v-model="form.value"
@@ -647,7 +647,7 @@ function getStatusBadge(status) {
 
                         <div v-if="form.type === 'percentage'">
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                Max Discount Cap ($)
+                                Max Discount Cap (৳)
                             </label>
                             <input
                                 v-model="form.max_discount"
@@ -657,7 +657,7 @@ function getStatusBadge(status) {
                                 placeholder="Optional limit, e.g. 50.00"
                                 class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
                             />
-                            <p class="text-[10px] text-slate-400 mt-0.5">Limits maximum dollar amount saved.</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Limits maximum amount saved.</p>
                         </div>
                     </div>
 
@@ -670,7 +670,7 @@ function getStatusBadge(status) {
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                    Min Order Spend ($)
+                                    Min Order Spend (৳)
                                 </label>
                                 <input
                                     v-model="form.min_spend"

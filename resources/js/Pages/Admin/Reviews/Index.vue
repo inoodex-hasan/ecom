@@ -348,7 +348,7 @@ function getStarPercent(count) {
                                 <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
                                     <span class="font-mono">SKU: {{ review.product?.sku || 'N/A' }}</span>
                                     <span>·</span>
-                                    <span class="font-bold text-slate-700 dark:text-slate-300">${{ Number(review.product?.price || 0).toFixed(2) }}</span>
+                                    <span class="font-bold text-slate-700 dark:text-slate-300">৳{{ Number(review.product?.price || 0).toFixed(2) }}</span>
                                 </div>
                             </div>
                         </div>

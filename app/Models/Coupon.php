@@ -104,11 +104,13 @@ class Coupon extends Model
 
     public function getFormattedDiscountAttribute(): string
     {
+        $symbol = Setting::get('currency_symbol', '৳');
+
         return match ($this->type) {
             'percentage' => rtrim(rtrim(number_format($this->value, 2), '0'), '.').'% OFF',
-            'fixed_cart' => '$'.number_format($this->value, 2).' OFF',
+            'fixed_cart' => $symbol.number_format($this->value, 2).' OFF',
             'free_shipping' => 'Free Shipping',
-            default => '$'.number_format($this->value, 2),
+            default => $symbol.number_format($this->value, 2),
         };
     }
 }

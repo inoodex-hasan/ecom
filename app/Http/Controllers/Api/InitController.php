@@ -23,8 +23,8 @@ class InitController extends Controller
             'store_tagline' => Setting::get('general.store_tagline', 'Your Premier Shopping Destination'),
             'store_logo' => Setting::get('general.store_logo'),
             'store_favicon' => Setting::get('general.store_favicon'),
-            'currency_symbol' => Setting::get('localization.currency_symbol', '$'),
-            'currency_code' => Setting::get('localization.currency', 'USD'),
+            'currency_symbol' => Setting::get('currency_symbol', Setting::get('localization.currency_symbol', '৳')),
+            'currency_code' => Setting::get('currency_code', Setting::get('localization.currency', 'BDT')),
             'contact_email' => Setting::get('contact.email', 'support@ecom.test'),
             'contact_phone' => Setting::get('contact.phone', '+1 (555) 019-2834'),
             'contact_address' => Setting::get('contact.address', '100 Market Street, Suite 500, San Francisco, CA'),
@@ -34,7 +34,7 @@ class InitController extends Controller
             'social_youtube' => Setting::get('social.youtube'),
             'free_shipping_threshold' => (float) Setting::get('shipping.free_shipping_threshold', 100),
             'default_shipping_fee' => (float) Setting::get('shipping.default_fee', 10),
-            'announcement_bar' => Setting::get('marketing.announcement_text', 'Free worldwide express shipping on all orders over $100!'),
+            'announcement_bar' => Setting::get('marketing.announcement_text', 'Free nationwide express shipping on all orders over ৳1,000!'),
         ];
 
         return response()->json([

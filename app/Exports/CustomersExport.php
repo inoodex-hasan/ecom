@@ -48,7 +48,7 @@ class CustomersExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
             'Postal Code',
             'Country',
             'Total Orders',
-            'Lifetime Value ($)',
+            'Lifetime Value (৳)',
             'Status',
             'Registered Date',
         ];

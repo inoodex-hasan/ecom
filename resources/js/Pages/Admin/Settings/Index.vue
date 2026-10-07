@@ -33,8 +33,8 @@ const form = useForm({
         store_name: props.settings?.store_name?.value || 'ApexStore',
         store_email: props.settings?.store_email?.value || 'support@apexstore.io',
         store_phone: props.settings?.store_phone?.value || '+1 (555) 234-5678',
-        currency_symbol: props.settings?.currency_symbol?.value || '$',
-        currency_code: props.settings?.currency_code?.value || 'USD',
+        currency_symbol: props.settings?.currency_symbol?.value || '৳',
+        currency_code: props.settings?.currency_code?.value || 'BDT',
         tax_rate_percentage: props.settings?.tax_rate_percentage?.value || '8.25',
         flat_shipping_rate: props.settings?.flat_shipping_rate?.value || '12.50',
         free_shipping_threshold: props.settings?.free_shipping_threshold?.value || '150.00',
@@ -302,7 +302,7 @@ function submit() {
                                 <input
                                     v-model="form.settings.currency_symbol"
                                     type="text"
-                                    placeholder="$"
+                                    placeholder="৳"
                                     class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
                                 />
                             </div>
@@ -311,7 +311,7 @@ function submit() {
                                 <input
                                     v-model="form.settings.currency_code"
                                     type="text"
-                                    placeholder="USD"
+                                    placeholder="BDT"
                                     class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 uppercase transition-all"
                                 />
                             </div>
@@ -347,7 +347,7 @@ function submit() {
                         <p class="text-[11px] text-slate-400 mt-1">Applied automatically to checkout order totals.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Flat Shipping Fee ($)</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Flat Shipping Fee (৳)</label>
                         <input
                             v-model="form.settings.flat_shipping_rate"
                             type="number"
@@ -357,7 +357,7 @@ function submit() {
                         <p class="text-[11px] text-slate-400 mt-1">Standard courier shipping rate for deliveries.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Free Shipping Above ($)</label>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Free Shipping Above (৳)</label>
                         <input
                             v-model="form.settings.free_shipping_threshold"
                             type="number"

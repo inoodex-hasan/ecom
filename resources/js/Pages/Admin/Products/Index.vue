@@ -394,10 +394,10 @@ function formVariantStockTotal() {
 }
 
 const formatCurrency = (val) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(val || 0);
+    return '৳' + Number(val || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 </script>
 
@@ -911,7 +911,7 @@ const formatCurrency = (val) => {
                             </h4>
                             <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                                 <div>
-                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Sales Price ($) *</label>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Sales Price (৳) *</label>
                                     <input
                                         v-model="form.price"
                                         type="number"
@@ -922,7 +922,7 @@ const formatCurrency = (val) => {
                                     />
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Compare / MRP ($)</label>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Compare / MRP (৳)</label>
                                     <input
                                         v-model="form.compare_price"
                                         type="number"
@@ -932,7 +932,7 @@ const formatCurrency = (val) => {
                                     />
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Cost Price ($)</label>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Cost Price (৳)</label>
                                     <input
                                         v-model="form.cost_price"
                                         type="number"
@@ -1496,7 +1496,7 @@ const formatCurrency = (val) => {
                                     <tr>
                                         <th class="px-3 py-2.5">Options</th>
                                         <th class="px-3 py-2.5">Variant SKU</th>
-                                        <th class="px-3 py-2.5">Price ($)</th>
+                                        <th class="px-3 py-2.5">Price (৳)</th>
                                         <th class="px-3 py-2.5">Stock</th>
                                         <th class="px-3 py-2.5 text-right"></th>
                                     </tr>

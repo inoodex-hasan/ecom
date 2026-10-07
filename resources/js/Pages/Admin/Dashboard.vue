@@ -53,7 +53,7 @@ const selectedTimeframe = ref('12m');
 
 // ─── Formatters ────────────────────────────────────────────
 const formatCurrency = (val) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(val || 0);
+    '৳' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 const formatNumber = (val) => new Intl.NumberFormat('en-US').format(val || 0);
 
@@ -83,12 +83,12 @@ const revenueChartOptions = computed(() => ({
     },
     xaxis: { categories: filteredChartData.value.categories, labels: { style: { colors: '#64748b', fontSize: '11px', fontWeight: 500 } }, axisBorder: { show: false }, axisTicks: { show: false } },
     yaxis: [
-        { labels: { formatter: (v) => '$' + Number(v / 1000).toFixed(1) + 'k', style: { colors: '#64748b', fontSize: '11px' } } },
+        { labels: { formatter: (v) => '৳' + Number(v / 1000).toFixed(1) + 'k', style: { colors: '#64748b', fontSize: '11px' } } },
         { opposite: true, labels: { formatter: (v) => Math.round(v).toString(), style: { colors: '#64748b', fontSize: '11px' } } },
     ],
     grid: { borderColor: '#1e293b40', strokeDashArray: 4, yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } },
     dataLabels: { enabled: false },
-    tooltip: { theme: 'dark', shared: true, intersect: false, y: [{ formatter: (v) => '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 }) }, { formatter: (v) => v + ' orders' }] },
+    tooltip: { theme: 'dark', shared: true, intersect: false, y: [{ formatter: (v) => '৳' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 }) }, { formatter: (v) => v + ' orders' }] },
     legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#94a3b8' }, markers: { radius: 4 } },
 }));
 
@@ -97,10 +97,10 @@ const compactChartOptions = computed(() => ({
     colors: ['#818cf8'],
     plotOptions: { bar: { columnWidth: '60%', borderRadius: 4 } },
     xaxis: { categories: filteredChartData.value.categories, labels: { style: { colors: '#64748b', fontSize: '10px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-    yaxis: { labels: { formatter: (v) => '$' + Number(v / 1000).toFixed(0) + 'k', style: { colors: '#64748b', fontSize: '10px' } } },
+    yaxis: { labels: { formatter: (v) => '৳' + Number(v / 1000).toFixed(0) + 'k', style: { colors: '#64748b', fontSize: '10px' } } },
     grid: { borderColor: '#1e293b20', strokeDashArray: 3 },
     dataLabels: { enabled: false },
-    tooltip: { theme: 'dark', y: { formatter: (v) => '$' + Number(v).toLocaleString() } },
+    tooltip: { theme: 'dark', y: { formatter: (v) => '৳' + Number(v).toLocaleString() } },
 }));
 
 const revenueChartSeries = computed(() => [

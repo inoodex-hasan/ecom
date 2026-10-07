@@ -85,21 +85,51 @@ watchEffect(() => {
     }
 });
 
-const allNavItems = [
-    { name: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
-    { name: 'Products', route: 'admin.products.index', icon: ShoppingBag, permission: 'products.view' },
-    { name: 'Inventory', route: 'admin.inventory.index', icon: Boxes, permission: 'inventory.view' },
-    { name: 'Orders', route: 'admin.orders.index', icon: ShoppingCart, permission: 'orders.view' },
-    { name: 'Fraud Shield', route: 'admin.fraud.index', icon: ShieldAlert, permission: 'fraud.view' },
-    { name: 'Categories', route: 'admin.categories.index', icon: FolderTree, permission: 'categories.view' },
-    { name: 'Banners', route: 'admin.banners.index', icon: Image, permission: 'banners.view' },
-    { name: 'Campaigns', route: 'admin.campaigns.index', icon: Zap, permission: 'promotions.view' },
-    { name: 'Coupons', route: 'admin.coupons.index', icon: Ticket, permission: 'coupons.view' },
-    { name: 'Reviews', route: 'admin.reviews.index', icon: Star, permission: 'reviews.view' },
-    { name: 'Blogs & Articles', route: 'admin.blogs.index', icon: Newspaper, permission: 'blogs.view' },
-    { name: 'Customers', route: 'admin.customers.index', icon: Users, permission: 'customers.view' },
-    { name: 'Staff & Roles', route: 'admin.staff.index', icon: ShieldCheck, permission: 'staff.view' },
-    { name: 'Settings', route: 'admin.settings.index', icon: Settings, permission: 'settings.view' },
+const navGroups = [
+    {
+        title: 'Overview',
+        items: [
+            { name: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
+        ],
+    },
+    {
+        title: 'Sales & Fulfillment',
+        items: [
+            { name: 'Orders', route: 'admin.orders.index', icon: ShoppingCart, permission: 'orders.view' },
+            { name: 'Fraud Shield', route: 'admin.fraud.index', icon: ShieldAlert, permission: 'fraud.view' },
+            { name: 'Customers', route: 'admin.customers.index', icon: Users, permission: 'customers.view' },
+        ],
+    },
+    {
+        title: 'Catalog & Inventory',
+        items: [
+            { name: 'Products', route: 'admin.products.index', icon: ShoppingBag, permission: 'products.view' },
+            { name: 'Categories', route: 'admin.categories.index', icon: FolderTree, permission: 'categories.view' },
+            { name: 'Inventory', route: 'admin.inventory.index', icon: Boxes, permission: 'inventory.view' },
+        ],
+    },
+    {
+        title: 'Marketing & Promos',
+        items: [
+            { name: 'Campaigns', route: 'admin.campaigns.index', icon: Zap, permission: 'promotions.view' },
+            { name: 'Coupons', route: 'admin.coupons.index', icon: Ticket, permission: 'coupons.view' },
+            { name: 'Banners', route: 'admin.banners.index', icon: Image, permission: 'banners.view' },
+        ],
+    },
+    {
+        title: 'Content & Community',
+        items: [
+            { name: 'Blogs & Articles', route: 'admin.blogs.index', icon: Newspaper, permission: 'blogs.view' },
+            { name: 'Reviews', route: 'admin.reviews.index', icon: Star, permission: 'reviews.view' },
+        ],
+    },
+    {
+        title: 'Administration',
+        items: [
+            { name: 'Staff & Roles', route: 'admin.staff.index', icon: ShieldCheck, permission: 'staff.view' },
+            { name: 'Settings', route: 'admin.settings.index', icon: Settings, permission: 'settings.view' },
+        ],
+    },
 ];
 
 function hasPermission(permission) {
@@ -112,7 +142,16 @@ function hasPermission(permission) {
     return Array.isArray(user.permissions) && user.permissions.includes(permission);
 }
 
-const navItems = computed(() => allNavItems.filter((item) => hasPermission(item.permission)));
+const filteredNavGroups = computed(() => {
+    return navGroups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => hasPermission(item.permission)),
+        }))
+        .filter((group) => group.items.length > 0);
+});
+
+const navItems = computed(() => filteredNavGroups.value.flatMap((g) => g.items));
 
 function toggleDarkMode() {
     isDarkMode.value = !isDarkMode.value;
@@ -198,32 +237,51 @@ function logout() {
                     </Link>
                 </div>
 
-                <!-- Navigation Links -->
-                <div class="flex-1 py-5 px-2.5 space-y-1 overflow-y-auto">
-                    <Link
-                        v-for="item in navItems"
-                        :key="item.name"
-                        :href="route(item.route)"
-                        :class="[
-                            route().current(item.route + '*')
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100',
-                            isSidebarOpen ? 'px-3' : 'justify-center px-0',
-                            'flex items-center gap-2.5 py-2.5 rounded-xl text-sm transition-all duration-150 group'
-                        ]"
-                        :title="!isSidebarOpen ? item.name : ''"
+                <!-- Navigation Links (Grouped) -->
+                <div class="flex-1 py-4 px-2.5 space-y-3 overflow-y-auto">
+                    <div
+                        v-for="(group, gIdx) in filteredNavGroups"
+                        :key="group.title"
+                        class="space-y-0.5"
                     >
-                        <component
-                            :is="item.icon"
+                        <!-- Group Header (Desktop Expanded) -->
+                        <div v-if="isSidebarOpen" class="px-3 pt-2 pb-1" :class="{ 'pt-0': gIdx === 0 }">
+                            <p class="text-[9.5px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
+                                {{ group.title }}
+                            </p>
+                        </div>
+                        <!-- Divider when collapsed (Desktop Mini) -->
+                        <div
+                            v-else-if="gIdx > 0"
+                            class="my-2 border-t border-slate-200/70 dark:border-slate-800/80 mx-2"
+                        />
+
+                        <!-- Items in Group -->
+                        <Link
+                            v-for="item in group.items"
+                            :key="item.name"
+                            :href="route(item.route)"
                             :class="[
                                 route().current(item.route + '*')
-                                    ? 'text-white'
-                                    : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300',
-                                'w-5 h-5 shrink-0 transition-colors'
+                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100',
+                                isSidebarOpen ? 'px-3' : 'justify-center px-0',
+                                'flex items-center gap-2.5 py-2.5 rounded-xl text-sm transition-all duration-150 group'
                             ]"
-                        />
-                        <span v-if="isSidebarOpen" class="truncate">{{ item.name }}</span>
-                    </Link>
+                            :title="!isSidebarOpen ? item.name : ''"
+                        >
+                            <component
+                                :is="item.icon"
+                                :class="[
+                                    route().current(item.route + '*')
+                                        ? 'text-white'
+                                        : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300',
+                                    'w-5 h-5 shrink-0 transition-colors'
+                                ]"
+                            />
+                            <span v-if="isSidebarOpen" class="truncate">{{ item.name }}</span>
+                        </Link>
+                    </div>
                 </div>
             </aside>
 
@@ -255,22 +313,33 @@ function logout() {
                         <X class="w-6 h-6" />
                     </button>
                 </div>
-                <div class="flex-1 py-4 px-3 space-y-1">
-                    <Link
-                        v-for="item in navItems"
-                        :key="item.name"
-                        :href="route(item.route)"
-                        @click="isMobileMenuOpen = false"
-                        :class="[
-                            route().current(item.route + '*')
-                                ? 'bg-indigo-600 text-white font-semibold'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
-                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm'
-                        ]"
+                <div class="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
+                    <div
+                        v-for="(group, gIdx) in filteredNavGroups"
+                        :key="'m-' + group.title"
+                        class="space-y-1"
                     >
-                        <component :is="item.icon" class="w-5 h-5" />
-                        <span>{{ item.name }}</span>
-                    </Link>
+                        <div class="px-3 pt-1 pb-1" :class="{ 'pt-0': gIdx === 0 }">
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                {{ group.title }}
+                            </p>
+                        </div>
+                        <Link
+                            v-for="item in group.items"
+                            :key="'m-' + item.name"
+                            :href="route(item.route)"
+                            @click="isMobileMenuOpen = false"
+                            :class="[
+                                route().current(item.route + '*')
+                                    ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150'
+                            ]"
+                        >
+                            <component :is="item.icon" class="w-5 h-5 shrink-0" />
+                            <span class="truncate">{{ item.name }}</span>
+                        </Link>
+                    </div>
                 </div>
             </aside>
 

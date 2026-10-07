@@ -509,8 +509,8 @@ function deleteSale(sale) {
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-slate-900 dark:text-white truncate">{{ item.product?.name }}</p>
                                         <div class="flex items-center gap-1.5 mt-0.5">
-                                            <span class="text-xs font-black text-rose-600 dark:text-rose-400 font-mono">${{ item.flash_price }}</span>
-                                            <span class="text-[10px] text-slate-400 line-through font-mono">${{ item.product?.price }}</span>
+                                            <span class="text-xs font-black text-rose-600 dark:text-rose-400 font-mono">৳{{ item.flash_price }}</span>
+                                            <span class="text-[10px] text-slate-400 line-through font-mono">৳{{ item.product?.price }}</span>
                                             <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
                                                 -{{ Math.round(item.discount_percentage) }}%
                                             </span>
@@ -639,7 +639,7 @@ function deleteSale(sale) {
                                 >
                                     <Plus class="w-3 h-3 text-amber-500" />
                                     <span>{{ p.name }}</span>
-                                    <span class="font-mono text-slate-400">(${{ p.price }})</span>
+                                    <span class="font-mono text-slate-400">(৳{{ p.price }})</span>
                                 </button>
                             </div>
 
@@ -650,7 +650,7 @@ function deleteSale(sale) {
                                         <tr>
                                             <th class="px-3 py-2">Product</th>
                                             <th class="px-2 py-2">Reg Price</th>
-                                            <th class="px-2 py-2">Flash Price ($)</th>
+                                            <th class="px-2 py-2">Flash Price (৳)</th>
                                             <th class="px-2 py-2">Discount (%)</th>
                                             <th class="px-2 py-2">Qty Limit</th>
                                             <th class="px-2 py-2 text-right">Remove</th>
@@ -662,7 +662,7 @@ function deleteSale(sale) {
                                                 {{ item.product_name }}
                                             </td>
                                             <td class="px-2 py-2 font-mono text-slate-400">
-                                                ${{ item.price }}
+                                                ৳{{ item.price }}
                                             </td>
                                             <td class="px-2 py-2">
                                                 <input

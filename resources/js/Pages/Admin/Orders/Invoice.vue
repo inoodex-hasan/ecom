@@ -8,10 +8,10 @@ const props = defineProps({
 });
 
 const formatCurrency = (val) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(val || 0);
+    return '৳' + Number(val || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 
 const formatDate = (dateStr) => {
