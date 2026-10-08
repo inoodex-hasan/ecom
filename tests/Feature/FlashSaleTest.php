@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\FlashSale;
 use App\Models\FlashSaleItem;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -250,5 +251,23 @@ class FlashSaleTest extends TestCase
 
         $this->assertTrue(Product::newArrival()->where('id', $newProduct->id)->exists());
         $this->assertEquals('Just Dropped', $newProduct->badge_label);
+    }
+
+    public function test_admin_can_update_navigation_menu_from_campaigns(): void
+    {
+        $payload = [
+            'navigation_menu' => [
+                ['label' => 'Mega Fest', 'href' => '/mega-fest', 'highlight' => true],
+                ['label' => 'Hot Clearance', 'href' => '/clearance', 'highlight' => false],
+            ],
+        ];
+
+        $response = $this->actingAs($this->admin)->post(route('admin.campaigns.navigation-menu'), $payload);
+
+        $response->assertRedirect();
+        $this->assertEquals(
+            $payload['navigation_menu'],
+            Setting::get('navigation_menu')
+        );
     }
 }

@@ -22,7 +22,8 @@ import {
     Clock,
     Sparkles,
     Flag,
-    ThumbsUp
+    ThumbsUp,
+    Package
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -337,10 +338,17 @@ function getStarPercent(count) {
                         <!-- Product Preview Info -->
                         <div class="flex items-center gap-2.5 min-w-0">
                             <img
-                                :src="review.product?.primary_image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'"
+                                v-if="review.product?.primary_image"
+                                :src="review.product.primary_image"
                                 :alt="review.product?.name"
                                 class="w-9 h-9 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/60 dark:border-slate-700/60"
                             />
+                            <div
+                                v-else
+                                class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shrink-0 flex items-center justify-center text-slate-400"
+                            >
+                                <Package class="w-4 h-4" />
+                            </div>
                             <div class="min-w-0">
                                 <h4 class="text-xs font-bold text-slate-900 dark:text-white truncate">
                                     {{ review.product?.name || 'Unknown Product' }}

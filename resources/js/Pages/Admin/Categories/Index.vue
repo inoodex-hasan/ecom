@@ -7,6 +7,8 @@ import CustomSelect from '@/Components/CustomSelect.vue';
 import {
     Plus,
     FolderTree,
+    Folder,
+    FolderOpen,
     Edit3,
     Trash2,
     X,
@@ -39,16 +41,29 @@ import {
     AlertCircle,
     UploadCloud,
     Check,
-    SlidersHorizontal
+    ChevronDown,
+    ChevronRight,
+    ChevronsUpDown,
+    Tag,
+    Eye,
+    EyeOff,
+    SlidersHorizontal,
+    ArrowUpRight
 } from 'lucide-vue-next';
 
 const props = defineProps({
-    categories: Array,
-    metrics: Object,
+    categories: {
+        type: Array,
+        default: () => [],
+    },
+    metrics: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
-// View mode: 'grid' | 'table'
-const viewMode = ref('grid');
+// View mode: 'tree' | 'grid' | 'table'
+const viewMode = ref('tree');
 
 // Search & Filter state
 const searchQuery = ref('');
@@ -56,54 +71,89 @@ const statusFilter = ref(''); // '' | 'active' | 'inactive'
 const levelFilter = ref(''); // '' | 'root' | 'sub'
 const sortBy = ref('sort_order'); // 'sort_order' | 'name_asc' | 'name_desc' | 'products_desc'
 
+// Tree expand/collapse tracking for root categories (all expanded by default)
+const expandedRoots = ref({});
+
+// Watch categories to auto-expand all roots initially
+watch(
+    () => props.categories,
+    (cats) => {
+        if (cats && cats.length > 0) {
+            cats.filter(c => !c.parent_id).forEach(r => {
+                if (expandedRoots.value[r.id] === undefined) {
+                    expandedRoots.value[r.id] = true;
+                }
+            });
+        }
+    },
+    { immediate: true }
+);
+
+function toggleRootExpand(rootId) {
+    expandedRoots.value[rootId] = !expandedRoots.value[rootId];
+}
+
+function expandAllRoots() {
+    (props.categories || []).filter(c => !c.parent_id).forEach(r => {
+        expandedRoots.value[r.id] = true;
+    });
+}
+
+function collapseAllRoots() {
+    (props.categories || []).filter(c => !c.parent_id).forEach(r => {
+        expandedRoots.value[r.id] = false;
+    });
+}
+
 // Available icon options with friendly names
 const availableIcons = [
     { value: 'FolderTree', label: 'General / Tree', icon: FolderTree },
-    { value: 'Tv', label: 'TV & Displays', icon: Tv },
-    { value: 'Smartphone', label: 'Smartphones & Tablets', icon: Smartphone },
-    { value: 'Laptop', label: 'Laptops & Computers', icon: Laptop },
-    { value: 'Headphones', label: 'Headphones & Audio', icon: Headphones },
-    { value: 'Watch', label: 'Watches & Wearables', icon: Watch },
-    { value: 'Cable', label: 'Cables & Hardware', icon: Cable },
-    { value: 'ShoppingBag', label: 'Retail & Bags', icon: ShoppingBag },
     { value: 'Shirt', label: 'Apparel & Clothing', icon: Shirt },
+    { value: 'ShoppingBag', label: 'Retail & Bags', icon: ShoppingBag },
     { value: 'Sparkles', label: 'Beauty & Cosmetics', icon: Sparkles },
+    { value: 'Watch', label: 'Watches & Wearables', icon: Watch },
+    { value: 'Tv', label: 'TV & Displays', icon: Tv },
+    { value: 'Smartphone', label: 'Phones & Tech', icon: Smartphone },
+    { value: 'Laptop', label: 'Computers', icon: Laptop },
+    { value: 'Headphones', label: 'Audio & Sound', icon: Headphones },
+    { value: 'Cable', label: 'Accessories', icon: Cable },
     { value: 'Home', label: 'Home & Living', icon: Home },
     { value: 'Armchair', label: 'Furniture & Decor', icon: Armchair },
     { value: 'Utensils', label: 'Kitchen & Dining', icon: Utensils },
-    { value: 'Wrench', label: 'Tools & Construction', icon: Wrench },
-    { value: 'Droplet', label: 'Liquids & Chemicals', icon: Droplet },
-    { value: 'Zap', label: 'Electronics & Energy', icon: Zap },
+    { value: 'Activity', label: 'Sports & Active', icon: Activity },
     { value: 'Camera', label: 'Cameras & Optics', icon: Camera },
-    { value: 'Activity', label: 'Sports & Outdoors', icon: Activity },
+    { value: 'Zap', label: 'Electronics', icon: Zap },
+    { value: 'Droplet', label: 'Fragrances & Care', icon: Droplet },
+    { value: 'Gift', label: 'Gifts & Festive', icon: Gift },
     { value: 'Book', label: 'Books & Stationery', icon: Book },
-    { value: 'Gift', label: 'Gifts & Toys', icon: Gift },
+    { value: 'Wrench', label: 'Tools & Hardware', icon: Wrench },
 ];
 
 const iconMap = {
     FolderTree,
+    Folder,
+    Shirt,
+    ShoppingBag,
+    Sparkles,
+    Watch,
     Tv,
     Smartphone,
     Laptop,
     Headphones,
-    Watch,
     Cable,
-    ShoppingBag,
-    Shirt,
-    Sparkles,
     Home,
     Armchair,
     Utensils,
-    Wrench,
-    Droplet,
-    Zap,
-    Camera,
     Activity,
-    Book,
+    Camera,
+    Zap,
+    Droplet,
     Gift,
+    Book,
+    Wrench,
 };
 
-// Filtered and Sorted Categories
+// Filtered Categories based on search & filters
 const filteredCategories = computed(() => {
     let list = [...(props.categories || [])];
 
@@ -149,9 +199,63 @@ const filteredCategories = computed(() => {
     return list;
 });
 
-// Category metrics calculated or passed from props
+// Tree Structure: Grouped by Root Categories with their nested children
+const treeRoots = computed(() => {
+    const all = props.categories || [];
+    const roots = all.filter(c => !c.parent_id);
+    const subMap = new Map();
+
+    all.forEach(c => {
+        if (c.parent_id) {
+            if (!subMap.has(c.parent_id)) subMap.set(c.parent_id, []);
+            subMap.get(c.parent_id).push(c);
+        }
+    });
+
+    // If there is an active search or status filter, apply it to the children as well
+    const query = searchQuery.value.toLowerCase().trim();
+
+    return roots.map(root => {
+        let children = subMap.get(root.id) || [];
+
+        // Apply filters to children
+        if (query) {
+            children = children.filter(child =>
+                child.name.toLowerCase().includes(query) ||
+                child.slug.toLowerCase().includes(query) ||
+                root.name.toLowerCase().includes(query)
+            );
+        }
+        if (statusFilter.value === 'active') {
+            children = children.filter(c => c.is_active);
+        } else if (statusFilter.value === 'inactive') {
+            children = children.filter(c => !c.is_active);
+        }
+
+        // Calculate total products in department (root + children)
+        const totalDeptProducts = (root.products_count || 0) +
+            (subMap.get(root.id) || []).reduce((sum, c) => sum + (c.products_count || 0), 0);
+
+        const rootMatches = !query ||
+            root.name.toLowerCase().includes(query) ||
+            root.slug.toLowerCase().includes(query);
+
+        return {
+            ...root,
+            children,
+            rawChildrenCount: (subMap.get(root.id) || []).length,
+            totalDeptProducts,
+            isRootVisible: rootMatches || children.length > 0,
+        };
+    }).filter(root => {
+        if (levelFilter.value === 'sub') return false;
+        return root.isRootVisible;
+    });
+});
+
+// Category metrics
 const computedMetrics = computed(() => {
-    if (props.metrics) return props.metrics;
+    if (props.metrics && Object.keys(props.metrics).length > 0) return props.metrics;
     const cats = props.categories || [];
     return {
         total_categories: cats.length,
@@ -179,24 +283,30 @@ const form = useForm({
     sort_order: 0,
 });
 
-// Parent Category Dropdown options (exclude self and self's children when editing)
+// Parent Category Dropdown options
 const parentOptions = computed(() => {
-    const options = [{ value: '', label: 'None (Top-Level Category)' }];
+    const options = [{ value: '', label: 'None (Top-Level Root Category)' }];
     const currentId = editingCategory.value?.id;
 
     (props.categories || []).forEach(cat => {
         // Exclude self when editing
         if (currentId && cat.id === currentId) return;
-        // Optionally exclude direct children of current category to prevent loops
+        // Exclude direct children of current category to prevent circular hierarchy
         if (currentId && cat.parent_id === currentId) return;
 
         options.push({
             value: cat.id,
-            label: cat.parent ? `${cat.parent.name} → ${cat.name}` : cat.name,
+            label: cat.parent ? `↳ ${cat.parent.name} → ${cat.name}` : `📁 ${cat.name} (Root)`,
         });
     });
 
     return options;
+});
+
+// Selected parent details for modal preview
+const selectedParent = computed(() => {
+    if (!form.parent_id) return null;
+    return (props.categories || []).find(c => c.id === Number(form.parent_id) || c.id === form.parent_id);
 });
 
 // Live slug sync when autoGenerateSlug is true
@@ -215,7 +325,7 @@ function openCreateModal(parentId = '') {
     editingCategory.value = null;
     autoGenerateSlug.value = true;
     form.reset();
-    form.parent_id = parentId;
+    form.parent_id = parentId ? Number(parentId) : '';
     form.is_active = true;
     form.sort_order = (props.categories?.length || 0) + 1;
     isModalOpen.value = true;
@@ -226,7 +336,7 @@ function openEditModal(cat) {
     autoGenerateSlug.value = false;
     form.name = cat.name;
     form.slug = cat.slug;
-    form.parent_id = cat.parent_id || '';
+    form.parent_id = cat.parent_id ? Number(cat.parent_id) : '';
     form.description = cat.description || '';
     form.icon = cat.icon || 'FolderTree';
     form.image = cat.image || '';
@@ -243,7 +353,7 @@ function handleImageUpload(e) {
     const data = new FormData();
     data.append('image', file);
 
-    axios.post(route('admin.categories.upload-image'), data, {
+    axios.post(route('admin.categories.upload-image', undefined, false) || '/admin/categories/upload-image', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
     })
     .then(res => {
@@ -306,15 +416,15 @@ function resetFilters() {
     sortBy.value = 'sort_order';
 }
 
-// Background gradient picker for icons based on category id or name
+// Background gradient picker for icons based on category name
 function getIconGradient(name = '') {
     const gradients = [
-        'from-indigo-500/15 to-purple-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-        'from-blue-500/15 to-cyan-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20',
-        'from-emerald-500/15 to-teal-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-        'from-amber-500/15 to-orange-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20',
-        'from-rose-500/15 to-pink-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20',
-        'from-violet-500/15 to-fuchsia-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20',
+        'from-indigo-500/20 to-purple-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+        'from-blue-500/20 to-cyan-500/20 text-blue-600 dark:text-blue-400 border-blue-500/25',
+        'from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+        'from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 border-amber-500/25',
+        'from-rose-500/20 to-pink-500/20 text-rose-600 dark:text-rose-400 border-rose-500/25',
+        'from-violet-500/20 to-fuchsia-500/20 text-violet-600 dark:text-violet-400 border-violet-500/25',
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -327,33 +437,49 @@ function getIconGradient(name = '') {
 
 <template>
     <AdminLayout>
-        <Head title="Product Categories - Admin Dashboard" />
+        <Head title="Catalog Categories & Hierarchy - Admin" />
 
         <template #header>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                        Categories
-                    </h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                            Categories & Hierarchy
+                        </h1>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                            {{ computedMetrics.total_categories }} Total
+                        </span>
+                    </div>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Structure your e-commerce catalog, manage hierarchies, and control storefront navigation.
+                        Organize your store departments, manage subcategories, and control storefront navigation.
                     </p>
+                </div>
+
+                <div class="flex items-center gap-2.5">
+                    <button
+                        @click="openCreateModal('')"
+                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all cursor-pointer active:scale-95"
+                    >
+                        <Plus class="w-4 h-4" />
+                        <span>Add Category</span>
+                    </button>
                 </div>
             </div>
         </template>
 
         <div class="space-y-6 pb-12">
-            <!-- Metric KPI Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric KPI Summary Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                 <!-- Total Categories -->
-                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group">
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group hover:border-indigo-500/30 transition-all">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Categories</p>
-                            <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ computedMetrics.total_categories }}</p>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ computedMetrics.root_categories }}</span> root,
-                                <span class="font-bold text-purple-600 dark:text-purple-400">{{ computedMetrics.sub_categories }}</span> subcategories
+                            <p class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">{{ computedMetrics.total_categories }}</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                                <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ computedMetrics.root_categories }} root</span>
+                                <span class="text-slate-300 dark:text-slate-700">•</span>
+                                <span class="font-bold text-purple-600 dark:text-purple-400">{{ computedMetrics.sub_categories }} sub</span>
                             </p>
                         </div>
                         <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
@@ -363,12 +489,12 @@ function getIconGradient(name = '') {
                 </div>
 
                 <!-- Root Departments -->
-                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group">
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group hover:border-purple-500/30 transition-all">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Root Departments</p>
-                            <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ computedMetrics.root_categories }}</p>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Top-level navigation tiers</p>
+                            <p class="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400 mt-1">{{ computedMetrics.root_categories }}</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Primary storefront tiers</p>
                         </div>
                         <div class="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
                             <Layers class="w-6 h-6" />
@@ -376,13 +502,13 @@ function getIconGradient(name = '') {
                     </div>
                 </div>
 
-                <!-- Products Categorized -->
-                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group">
+                <!-- Catalog Products -->
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group hover:border-emerald-500/30 transition-all">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Catalog Products</p>
-                            <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{{ computedMetrics.total_products }}</p>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Organized in categories</p>
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Categorized Products</p>
+                            <p class="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{{ computedMetrics.total_products }}</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Assigned to catalog</p>
                         </div>
                         <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
                             <ShoppingBag class="w-6 h-6" />
@@ -391,15 +517,15 @@ function getIconGradient(name = '') {
                 </div>
 
                 <!-- Storefront Visibility -->
-                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group">
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden group hover:border-blue-500/30 transition-all">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Visible in Store</p>
-                            <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Store Visibility</p>
+                            <p class="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 mt-1">
                                 {{ computedMetrics.total_categories ? Math.round((computedMetrics.active_categories / computedMetrics.total_categories) * 100) : 0 }}%
                             </p>
                             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                {{ computedMetrics.active_categories }} of {{ computedMetrics.total_categories }} active
+                                {{ computedMetrics.active_categories }} active in catalog
                             </p>
                         </div>
                         <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
@@ -410,19 +536,25 @@ function getIconGradient(name = '') {
             </div>
 
             <!-- Integrated Filter & Action Toolbar -->
-            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-xs space-y-4">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-4 shadow-xs space-y-3.5">
                 <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-                    <!-- Left: Search and Dropdown Filters -->
-                    <div class="flex flex-wrap items-center gap-3 flex-1">
-                        <!-- Search Box -->
-                        <div class="relative w-full sm:w-72">
+                    <!-- Left: Search Box -->
+                    <div class="flex flex-wrap items-center gap-2.5 flex-1">
+                        <div class="relative w-full sm:w-80">
                             <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                             <input
                                 v-model="searchQuery"
                                 type="text"
-                                placeholder="Search category, slug, or parent..."
-                                class="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Search by name, slug, or parent..."
+                                class="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                             />
+                            <button
+                                v-if="searchQuery"
+                                @click="searchQuery = ''"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                <X class="w-3.5 h-3.5" />
+                            </button>
                         </div>
 
                         <!-- Status Filter -->
@@ -444,7 +576,7 @@ function getIconGradient(name = '') {
                                 v-model="levelFilter"
                                 :options="[
                                     { value: '', label: 'All Levels' },
-                                    { value: 'root', label: 'Root Departments' },
+                                    { value: 'root', label: 'Root Only' },
                                     { value: 'sub', label: 'Subcategories Only' },
                                 ]"
                                 placeholder="Hierarchy"
@@ -465,15 +597,6 @@ function getIconGradient(name = '') {
                             />
                         </div>
 
-                        <div class="flex items-center gap-3">
-                    <button
-                        @click="openCreateModal('')"
-                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer active:scale-95"
-                    >
-                        <Plus class="w-4 h-4" /> Add Category
-                    </button>
-                </div>
-
                         <!-- Reset Filter Button -->
                         <button
                             v-if="searchQuery || statusFilter || levelFilter || sortBy !== 'sort_order'"
@@ -485,8 +608,22 @@ function getIconGradient(name = '') {
                         </button>
                     </div>
 
-                    <!-- Right: View Mode Toggle -->
-                    <div class="flex items-center gap-1.5 self-end lg:self-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                    <!-- Right: View Mode Toggle (Tree, Grid, Table) -->
+                    <div class="flex items-center gap-1 self-start sm:self-end lg:self-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                        <button
+                            @click="viewMode = 'tree'"
+                            :class="[
+                                viewMode === 'tree'
+                                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold'
+                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
+                                'px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer'
+                            ]"
+                            title="Interactive Hierarchy Tree"
+                        >
+                            <FolderTree class="w-3.5 h-3.5" />
+                            Tree View
+                        </button>
+
                         <button
                             @click="viewMode = 'grid'"
                             :class="[
@@ -495,11 +632,12 @@ function getIconGradient(name = '') {
                                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
                                 'px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer'
                             ]"
-                            title="Grid View"
+                            title="Grid Cards"
                         >
                             <LayoutGrid class="w-3.5 h-3.5" />
-                            Grid
+                            Cards
                         </button>
+
                         <button
                             @click="viewMode = 'table'"
                             :class="[
@@ -508,17 +646,329 @@ function getIconGradient(name = '') {
                                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
                                 'px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer'
                             ]"
-                            title="Table View"
+                            title="Compact Data Table"
                         >
                             <List class="w-3.5 h-3.5" />
                             Table
                         </button>
                     </div>
                 </div>
+
+                <!-- Quick Filter Badges -->
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick Filter:</span>
+                        <button
+                            @click="levelFilter = ''; statusFilter = ''"
+                            :class="[!levelFilter && !statusFilter ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200']"
+                            class="px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                            All ({{ computedMetrics.total_categories }})
+                        </button>
+                        <button
+                            @click="levelFilter = 'root'; statusFilter = ''"
+                            :class="[levelFilter === 'root' ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200']"
+                            class="px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                            Root Departments ({{ computedMetrics.root_categories }})
+                        </button>
+                        <button
+                            @click="levelFilter = 'sub'; statusFilter = ''"
+                            :class="[levelFilter === 'sub' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200']"
+                            class="px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                            Subcategories ({{ computedMetrics.sub_categories }})
+                        </button>
+                        <button
+                            @click="statusFilter = 'active'; levelFilter = ''"
+                            :class="[statusFilter === 'active' ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200']"
+                            class="px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                            Active Only ({{ computedMetrics.active_categories }})
+                        </button>
+                    </div>
+
+                    <div v-if="viewMode === 'tree'" class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400">
+                        <button @click="expandAllRoots" class="hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors cursor-pointer">
+                            Expand All
+                        </button>
+                        <span>•</span>
+                        <button @click="collapseAllRoots" class="hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors cursor-pointer">
+                            Collapse All
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- ================= VIEW 1: VISUAL CARD GRID ================= -->
-            <div v-if="viewMode === 'grid'">
+            <!-- ================= VIEW 1: HERO HIERARCHY TREE VIEW ================= -->
+            <div v-if="viewMode === 'tree'" class="space-y-4">
+                <div v-if="treeRoots.length === 0" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center">
+                    <FolderTree class="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">No matching categories found</h3>
+                    <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Try clearing your filters or create a new category.</p>
+                    <button
+                        @click="openCreateModal('')"
+                        class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                    >
+                        <Plus class="w-4 h-4" /> Add Root Category
+                    </button>
+                </div>
+
+                <!-- Tree Root Cards -->
+                <div
+                    v-for="root in treeRoots"
+                    :key="root.id"
+                    class="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs hover:border-indigo-500/40 transition-all duration-200"
+                >
+                    <!-- Root Department Header Bar -->
+                    <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-50/80 via-white to-indigo-50/30 dark:from-slate-850 dark:via-slate-900 dark:to-indigo-950/20 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-3.5">
+                            <!-- Expand/Collapse toggle button -->
+                            <button
+                                @click="toggleRootExpand(root.id)"
+                                class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                :title="expandedRoots[root.id] ? 'Collapse Subcategories' : 'Expand Subcategories'"
+                            >
+                                <ChevronDown
+                                    class="w-4 h-4 transition-transform duration-200"
+                                    :class="{ '-rotate-90': !expandedRoots[root.id] }"
+                                />
+                            </button>
+
+                            <!-- Department Thumbnail / Icon -->
+                            <div
+                                v-if="root.image"
+                                class="w-12 h-12 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100"
+                            >
+                                <img :src="root.image" :alt="root.name" class="w-full h-full object-cover" />
+                            </div>
+                            <div
+                                v-else
+                                :class="[
+                                    getIconGradient(root.name),
+                                    'w-12 h-12 rounded-2xl bg-gradient-to-br border flex items-center justify-center shrink-0 shadow-xs'
+                                ]"
+                            >
+                                <component :is="iconMap[root.icon] || FolderTree" class="w-6 h-6" />
+                            </div>
+
+                            <!-- Department Info -->
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                                        {{ root.name }}
+                                    </h3>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                        Root Department
+                                    </span>
+                                    <span class="font-mono text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                        /{{ root.slug }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {{ root.description || 'Primary storefront department.' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Right Stats & Actions -->
+                        <div class="flex items-center gap-3 self-end md:self-center">
+                            <!-- Subcategory count chip -->
+                            <div class="px-3 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/40 text-center">
+                                <span class="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider block">Subcategories</span>
+                                <span class="text-sm font-black text-indigo-700 dark:text-indigo-300 font-mono">{{ root.rawChildrenCount }}</span>
+                            </div>
+
+                            <!-- Products in Department -->
+                            <Link
+                                :href="route('admin.products.index', { category: root.id })"
+                                class="px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 text-center hover:bg-emerald-100/70 transition-colors group/link"
+                                title="View all products under this department"
+                            >
+                                <span class="text-[10px] font-bold text-emerald-500 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-center gap-1">
+                                    <span>Products</span>
+                                    <ArrowUpRight class="w-2.5 h-2.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                                </span>
+                                <span class="text-sm font-black text-emerald-700 dark:text-emerald-300 font-mono">{{ root.totalDeptProducts }}</span>
+                            </Link>
+
+                            <!-- Active Switch -->
+                            <button
+                                @click="toggleStatus(root)"
+                                :title="root.is_active ? 'Department active - click to disable' : 'Department inactive - click to activate'"
+                                :class="[
+                                    root.is_active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400',
+                                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors'
+                                ]"
+                            >
+                                <span
+                                    :class="[
+                                        root.is_active ? 'translate-x-5' : 'translate-x-0',
+                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-200'
+                                    ]"
+                                />
+                            </button>
+
+                            <!-- Add Sub Button -->
+                            <button
+                                @click="openCreateModal(root.id)"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 transition-colors cursor-pointer"
+                                title="Add a subcategory directly under this department"
+                            >
+                                <Plus class="w-3.5 h-3.5" />
+                                <span>Add Sub</span>
+                            </button>
+
+                            <!-- Edit Root -->
+                            <button
+                                @click="openEditModal(root)"
+                                class="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                                title="Edit Department"
+                            >
+                                <Edit3 class="w-4 h-4" />
+                            </button>
+
+                            <!-- Delete Root -->
+                            <button
+                                @click="deleteCategory(root)"
+                                class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                title="Delete Department"
+                            >
+                                <Trash2 class="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Nested Subcategories Grid (Collapsible) -->
+                    <div v-show="expandedRoots[root.id]" class="p-5 bg-slate-50/50 dark:bg-slate-900/40">
+                        <div v-if="root.children.length === 0" class="text-center py-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                            <Layers class="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                            <p class="text-xs font-bold text-slate-600 dark:text-slate-400">No subcategories under {{ root.name }} yet</p>
+                            <button
+                                @click="openCreateModal(root.id)"
+                                class="mt-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                            >
+                                <Plus class="w-3.5 h-3.5" /> Add First Subcategory
+                            </button>
+                        </div>
+
+                        <div v-else>
+                            <div class="flex items-center justify-between mb-3 px-1">
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <CornerDownRight class="w-3.5 h-3.5 text-indigo-500" />
+                                    Subcategories under {{ root.name }} ({{ root.children.length }})
+                                </span>
+                                <span class="text-[11px] text-slate-400">Click any card to edit or add products</span>
+                            </div>
+
+                            <!-- Subcategories Grid -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                <div
+                                    v-for="child in root.children"
+                                    :key="child.id"
+                                    class="bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-3.5 shadow-2xs hover:border-indigo-500/50 hover:shadow-md hover:shadow-indigo-500/5 transition-all group flex flex-col justify-between"
+                                >
+                                    <div>
+                                        <div class="flex items-start justify-between gap-2 mb-2">
+                                            <div class="flex items-center gap-2.5">
+                                                <!-- Small icon or image -->
+                                                <div
+                                                    v-if="child.image"
+                                                    class="w-8 h-8 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100"
+                                                >
+                                                    <img :src="child.image" :alt="child.name" class="w-full h-full object-cover" />
+                                                </div>
+                                                <div
+                                                    v-else
+                                                    :class="[
+                                                        getIconGradient(child.name),
+                                                        'w-8 h-8 rounded-xl bg-gradient-to-br border flex items-center justify-center shrink-0 text-xs'
+                                                    ]"
+                                                >
+                                                    <component :is="iconMap[child.icon] || Tag" class="w-4 h-4" />
+                                                </div>
+
+                                                <div>
+                                                    <h4 class="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
+                                                        {{ child.name }}
+                                                    </h4>
+                                                    <span class="font-mono text-[9px] text-slate-400 block">
+                                                        /{{ child.slug }}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Active switch -->
+                                            <button
+                                                @click="toggleStatus(child)"
+                                                :title="child.is_active ? 'Active' : 'Disabled'"
+                                                :class="[
+                                                    child.is_active ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700',
+                                                    'relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors'
+                                                ]"
+                                            >
+                                                <span
+                                                    :class="[
+                                                        child.is_active ? 'translate-x-3' : 'translate-x-0',
+                                                        'pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200'
+                                                    ]"
+                                                />
+                                            </button>
+                                        </div>
+
+                                        <p v-if="child.description" class="text-[11px] text-slate-400 line-clamp-1 mb-2">
+                                            {{ child.description }}
+                                        </p>
+                                    </div>
+
+                                    <!-- Bottom Row of Child: Products badge + Quick actions -->
+                                    <div class="pt-2.5 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                        <Link
+                                            :href="route('admin.products.index', { category: child.id })"
+                                            class="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group/p"
+                                            title="View products in this subcategory"
+                                        >
+                                            <span class="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">
+                                                {{ child.products_count || 0 }}
+                                            </span>
+                                            <span>items</span>
+                                            <ExternalLink class="w-2.5 h-2.5 text-slate-400 group-hover/p:translate-x-0.5 transition-transform" />
+                                        </Link>
+
+                                        <div class="flex items-center gap-1">
+                                            <!-- Add 3rd level subcategory -->
+                                            <button
+                                                @click="openCreateModal(child.id)"
+                                                class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                                                title="Add Child Subcategory"
+                                            >
+                                                <Plus class="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                @click="openEditModal(child)"
+                                                class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                                                title="Edit Subcategory"
+                                            >
+                                                <Edit3 class="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                @click="deleteCategory(child)"
+                                                class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                                title="Delete Subcategory"
+                                            >
+                                                <Trash2 class="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 2: VISUAL CARD GRID ================= -->
+            <div v-else-if="viewMode === 'grid'">
                 <div v-if="filteredCategories.length === 0" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center">
                     <FolderTree class="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
                     <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">No categories found</h3>
@@ -541,7 +991,6 @@ function getIconGradient(name = '') {
                             <!-- Header Bar of Card: Thumbnail / Icon + Status Switch -->
                             <div class="flex items-start justify-between gap-3 mb-4">
                                 <div class="flex items-center gap-3">
-                                    <!-- Image Thumbnail or Gradient Icon Avatar -->
                                     <div
                                         v-if="cat.image"
                                         class="w-12 h-12 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
@@ -575,16 +1024,14 @@ function getIconGradient(name = '') {
                                     @click="toggleStatus(cat)"
                                     :title="cat.is_active ? 'Click to disable' : 'Click to activate'"
                                     :class="[
-                                        cat.is_active
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-slate-200 dark:bg-slate-700 text-slate-400',
+                                        cat.is_active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400',
                                         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none'
                                     ]"
                                 >
                                     <span
                                         :class="[
                                             cat.is_active ? 'translate-x-4' : 'translate-x-0',
-                                            'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out'
+                                            'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200'
                                         ]"
                                     />
                                 </button>
@@ -600,7 +1047,7 @@ function getIconGradient(name = '') {
                             <div v-else class="mb-2.5">
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
                                     <Layers class="w-3 h-3" />
-                                    Root
+                                    Root Category
                                 </span>
                             </div>
 
@@ -631,7 +1078,6 @@ function getIconGradient(name = '') {
 
                         <!-- Card Footer -->
                         <div class="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <!-- Product count badge linking to product catalog -->
                             <Link
                                 :href="route('admin.products.index', { category: cat.id })"
                                 class="text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition-colors group/link"
@@ -644,7 +1090,6 @@ function getIconGradient(name = '') {
                                 <ExternalLink class="w-3 h-3 text-slate-400 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
                             </Link>
 
-                            <!-- Quick Action Buttons -->
                             <div class="flex items-center gap-1">
                                 <button
                                     @click="openCreateModal(cat.id)"
@@ -673,7 +1118,7 @@ function getIconGradient(name = '') {
                 </div>
             </div>
 
-            <!-- ================= VIEW 2: STRUCTURED DATA TABLE ================= -->
+            <!-- ================= VIEW 3: STRUCTURED DATA TABLE ================= -->
             <div v-else class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-600 dark:text-slate-300">
@@ -733,7 +1178,7 @@ function getIconGradient(name = '') {
                                     </div>
                                     <div v-else class="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold text-xs">
                                         <Layers class="w-3.5 h-3.5" />
-                                        <span>Root Category</span>
+                                        <span>Root Department</span>
                                     </div>
                                 </td>
 
@@ -773,7 +1218,7 @@ function getIconGradient(name = '') {
                                         <span
                                             :class="[
                                                 cat.is_active ? 'translate-x-4' : 'translate-x-0',
-                                                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200'
+                                                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200'
                                             ]"
                                         />
                                     </button>
@@ -827,7 +1272,7 @@ function getIconGradient(name = '') {
             >
                 <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl my-8">
                     <!-- Modal Header -->
-                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
                                 <FolderTree class="w-5 h-5" />
@@ -836,19 +1281,37 @@ function getIconGradient(name = '') {
                                 <h3 class="text-base font-bold text-slate-900 dark:text-white">
                                     {{ editingCategory ? `Edit "${editingCategory.name}"` : 'Create New Category' }}
                                 </h3>
-                                <p class="text-xs text-slate-400">Configure hierarchy, storefront visuals, and metadata.</p>
+                                <p class="text-xs text-slate-400">Configure hierarchy placement, visuals, and storefront metadata.</p>
                             </div>
                         </div>
                         <button
                             @click="isModalOpen = false"
-                            class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >
                             <X class="w-5 h-5" />
                         </button>
                     </div>
 
+                    <!-- Hierarchy Preview Box -->
+                    <div class="px-6 py-3 bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-indigo-100/50 dark:border-indigo-900/30 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 dark:text-slate-400 font-medium">Placement:</span>
+                            <span v-if="!form.parent_id" class="inline-flex items-center gap-1 font-bold text-indigo-600 dark:text-indigo-400">
+                                <Layers class="w-3.5 h-3.5" />
+                                Top-Level Root Department
+                            </span>
+                            <span v-else class="inline-flex items-center gap-1 font-bold text-purple-600 dark:text-purple-400">
+                                <CornerDownRight class="w-3.5 h-3.5" />
+                                Subcategory under {{ selectedParent?.name || 'Selected Parent' }}
+                            </span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono">
+                            {{ form.slug ? `/${form.slug}` : '' }}
+                        </span>
+                    </div>
+
                     <!-- Modal Form -->
-                    <form @submit.prevent="submit" class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                    <form @submit.prevent="submit" class="p-6 space-y-5 max-h-[72vh] overflow-y-auto">
                         <!-- Category Name & Slug -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
@@ -859,7 +1322,7 @@ function getIconGradient(name = '') {
                                     v-model="form.name"
                                     type="text"
                                     required
-                                    placeholder="e.g. Consumer Electronics"
+                                    placeholder="e.g. Mens Casual Shirts"
                                     class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
@@ -906,7 +1369,7 @@ function getIconGradient(name = '') {
 
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                    Sort Order
+                                    Display Sort Order
                                 </label>
                                 <input
                                     v-model.number="form.sort_order"
@@ -926,11 +1389,11 @@ function getIconGradient(name = '') {
 
                             <div v-if="form.image" class="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full h-32 bg-slate-100 dark:bg-slate-800 group">
                                 <img :src="form.image" alt="Category Preview" class="w-full h-full object-cover" />
-                                <div class="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <div class="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                     <button
                                         type="button"
                                         @click="removeImage"
-                                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1"
+                                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
                                     >
                                         <Trash2 class="w-3.5 h-3.5" /> Remove Image
                                     </button>
@@ -961,12 +1424,12 @@ function getIconGradient(name = '') {
                             </div>
                         </div>
 
-                        <!-- Visual Icon Selector Grid -->
+                        <!-- Department Icon Grid Selector -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
                                 Department Icon
                             </label>
-                            <div class="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-36 overflow-y-auto p-1 border border-slate-100 dark:border-slate-800 rounded-2xl">
+                            <div class="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-36 overflow-y-auto p-1 border border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-850">
                                 <button
                                     v-for="opt in availableIcons"
                                     :key="opt.value"
@@ -974,8 +1437,8 @@ function getIconGradient(name = '') {
                                     @click="form.icon = opt.value"
                                     :class="[
                                         form.icon === opt.value
-                                            ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-600 ring-offset-2 dark:ring-offset-slate-900'
-                                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750',
+                                            ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-600 ring-offset-2 dark:ring-offset-slate-900 shadow-sm'
+                                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 border border-slate-200/60 dark:border-slate-700/60',
                                         'p-2 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer'
                                     ]"
                                     :title="opt.label"
@@ -1001,7 +1464,7 @@ function getIconGradient(name = '') {
                         <div class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
                             <div>
                                 <span class="text-xs font-bold text-slate-900 dark:text-white block">Active in Storefront</span>
-                                <span class="text-[11px] text-slate-400">Controls visibility in the navigation menu and product filtering</span>
+                                <span class="text-[11px] text-slate-400">Controls visibility in menus, filter pills, and product catalog</span>
                             </div>
                             <button
                                 type="button"
@@ -1014,7 +1477,7 @@ function getIconGradient(name = '') {
                                 <span
                                     :class="[
                                         form.is_active ? 'translate-x-5' : 'translate-x-0',
-                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out'
+                                        'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-200'
                                     ]"
                                 />
                             </button>
@@ -1032,7 +1495,7 @@ function getIconGradient(name = '') {
                             <button
                                 type="submit"
                                 :disabled="form.processing || isUploadingImage"
-                                class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer flex items-center gap-2"
+                                class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer flex items-center gap-2"
                             >
                                 <Check class="w-4 h-4" />
                                 {{ editingCategory ? 'Update Category' : 'Create Category' }}

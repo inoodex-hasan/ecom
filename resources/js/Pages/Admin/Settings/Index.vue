@@ -15,7 +15,9 @@ import {
     Trash2,
     Globe,
     Loader2,
-    Sparkles
+    Sparkles,
+    Compass,
+    Zap
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -367,7 +369,7 @@ function submit() {
                         <p class="text-[11px] text-slate-400 mt-1">Orders exceeding this amount receive free delivery.</p>
                     </div>
                 </div>
-            </div>
+         </div>
 
             <!-- Save Action Bar -->
             <div class="flex items-center justify-between pt-2">

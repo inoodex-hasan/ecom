@@ -345,10 +345,17 @@ function formatDate(dt) {
                     <!-- Cover Image Container -->
                     <div class="relative h-48 bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
                         <img
-                            :src="post.cover_image || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&auto=format&fit=crop&q=80'"
+                            v-if="post.cover_image"
+                            :src="post.cover_image"
                             :alt="post.title"
                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
+                        <div
+                            v-else
+                            class="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-800"
+                        >
+                            <Newspaper class="w-10 h-10" />
+                        </div>
                         <div class="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
 
                         <!-- Category Pill -->

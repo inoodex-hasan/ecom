@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\FlashSaleItem;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,11 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Product::where('status', 'published')
-            ->with(['category:id,name,slug', 'brand:id,name,slug'])
+            ->with([
+                'category:id,name,slug',
+                'brand:id,name,slug',
+                'variants:id,product_id,sku,price,option_values',
+            ])
             ->withCount('variants');
 
         // Search
@@ -29,16 +34,25 @@ class ProductController extends Controller
             });
         }
 
-        // Category filter (slug or id)
+        // Category filter (slug or id) - includes root category and any child subcategories
         if ($request->filled('category')) {
             $cat = $request->query('category');
-            $query->whereHas('category', function ($q) use ($cat) {
-                if (is_numeric($cat)) {
-                    $q->where('id', (int) $cat);
-                } else {
-                    $q->where('slug', $cat);
-                }
-            });
+            $categoryModel = is_numeric($cat)
+                ? Category::find((int) $cat)
+                : Category::where('slug', $cat)->first();
+
+            if ($categoryModel) {
+                $categoryIds = $categoryModel->getAllDescendantIds();
+                $query->whereIn('category_id', $categoryIds);
+            } else {
+                $query->whereHas('category', function ($q) use ($cat) {
+                    if (is_numeric($cat)) {
+                        $q->where('id', (int) $cat);
+                    } else {
+                        $q->where('slug', $cat);
+                    }
+                });
+            }
         }
 
         // Brand filter (slug or id)
@@ -85,7 +99,7 @@ class ProductController extends Controller
             default => $query->latest(),
         };
 
-        $perPage = min(50, max(1, (int) $request->query('per_page', 16)));
+        $perPage = min(100, max(1, (int) $request->query('per_page', 16)));
         $products = $query->paginate($perPage);
 
         return response()->json([

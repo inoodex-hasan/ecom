@@ -67,7 +67,7 @@ class BannerController extends Controller
             'mobile_image_url' => 'nullable|string|max:2048',
             'button_text' => 'nullable|string|max:100',
             'link_url' => 'nullable|string|max:2048',
-            'placement' => 'required|in:hero_slider,home_banner,category_banner,popup_promo',
+            'placement' => 'required|in:hero_slider,home_banner,category_banner,popup_promo,home_video',
             'sort_order' => 'integer|min:0',
             'is_active' => 'boolean',
             'starts_at' => 'nullable|date',
@@ -89,7 +89,7 @@ class BannerController extends Controller
             'mobile_image_url' => 'nullable|string|max:2048',
             'button_text' => 'nullable|string|max:100',
             'link_url' => 'nullable|string|max:2048',
-            'placement' => 'required|in:hero_slider,home_banner,category_banner,popup_promo',
+            'placement' => 'required|in:hero_slider,home_banner,category_banner,popup_promo,home_video',
             'sort_order' => 'integer|min:0',
             'is_active' => 'boolean',
             'starts_at' => 'nullable|date',
@@ -111,10 +111,12 @@ class BannerController extends Controller
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:3072', 'dimensions:max_width=4000,max_height=4000'],
+            'image' => ['required', 'file', 'mimetypes:image/jpeg,image/png,image/jpg,image/webp,video/mp4,video/webm', 'max:51200'],
         ]);
 
-        $path = $request->file('image')->store('banners', 'public');
+        $file = $request->file('image');
+        $folder = str_starts_with($file->getMimeType(), 'video/') ? 'videos' : 'banners';
+        $path = $file->store($folder, 'public');
 
         return response()->json([
             'url' => asset('storage/'.$path),

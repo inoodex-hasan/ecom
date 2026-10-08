@@ -26,7 +26,6 @@ class SettingController extends Controller
     {
         $request->validate([
             'settings' => 'nullable|array',
-            'settings.*' => 'nullable|string',
             'store_logo_file' => 'nullable|image|mimes:jpg,jpeg,png,webp,svg|max:3072',
             'store_favicon_file' => 'nullable|file|mimes:ico,png,svg,webp,jpg|max:1024',
             'remove_logo' => 'nullable|boolean',
@@ -36,9 +35,16 @@ class SettingController extends Controller
         if ($request->has('settings') && is_array($request->input('settings'))) {
             $upsertData = [];
             foreach ($request->input('settings') as $key => $value) {
+                if ($key === 'navigation_menu') {
+                    $jsonVal = is_string($value) ? json_decode($value, true) : $value;
+                    Setting::set('navigation_menu', $jsonVal ?? [], 'json', 'general');
+
+                    continue;
+                }
+
                 $upsertData[] = [
                     'key' => (string) $key,
-                    'value' => (string) $value,
+                    'value' => is_array($value) ? json_encode($value) : (string) $value,
                 ];
             }
             if (! empty($upsertData)) {

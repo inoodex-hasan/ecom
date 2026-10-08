@@ -475,7 +475,8 @@ const statRows = computed(() => [
                         <div class="space-y-4">
                             <div v-for="(prod, idx) in topProducts" :key="prod.product_id" class="flex items-center gap-3">
                                 <div :class="[medalBg[idx], 'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0']"><span :class="[medalColors[idx], 'text-xs font-black']">{{ idx + 1 }}</span></div>
-                                <img :src="prod.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=80'" alt="Product" class="w-8 h-8 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 flex-shrink-0" />
+                                <img v-if="prod.image" :src="prod.image" alt="Product" class="w-8 h-8 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 flex-shrink-0" />
+                                <div v-else class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0"><Package class="w-4 h-4" /></div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between text-xs mb-1 gap-2">
                                         <span class="font-semibold text-slate-800 dark:text-slate-200 truncate">{{ prod.product_name }}</span>
@@ -637,7 +638,8 @@ const statRows = computed(() => [
                         <div class="space-y-3">
                             <div v-for="(prod, idx) in topProducts" :key="prod.product_id" class="flex items-center gap-2.5">
                                 <span :class="[medalColors[idx], 'text-[10px] font-black w-4 text-center flex-shrink-0']">{{ idx + 1 }}</span>
-                                <img :src="prod.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=80'" alt="" class="w-7 h-7 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 flex-shrink-0" />
+                                <img v-if="prod.image" :src="prod.image" alt="" class="w-7 h-7 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 flex-shrink-0" />
+                                <div v-else class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0"><Package class="w-3.5 h-3.5" /></div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between gap-1 text-[11px]">
                                         <span class="font-semibold text-slate-700 dark:text-slate-200 truncate">{{ prod.product_name }}</span>

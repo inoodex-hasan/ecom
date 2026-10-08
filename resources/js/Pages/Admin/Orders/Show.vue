@@ -8,6 +8,7 @@ import {
     CheckCircle2,
     Truck,
     PackageCheck,
+    Package,
     Clock,
     XCircle,
     User,
@@ -291,10 +292,17 @@ function getStatusBadge(status) {
                                         <td class="px-6 py-4">
                                             <div class="flex items-center gap-3">
                                                 <img
-                                                    :src="item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'"
+                                                    v-if="item.image"
+                                                    :src="item.image"
                                                     alt="Item"
                                                     class="w-12 h-12 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
                                                 />
+                                                <div
+                                                    v-else
+                                                    class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center text-slate-400"
+                                                >
+                                                    <Package class="w-6 h-6" />
+                                                </div>
                                                 <div>
                                                     <p class="text-xs font-semibold text-slate-900 dark:text-white">{{ item.product_name }}</p>
                                                     <p class="text-[11px] font-mono text-slate-400">{{ item.sku }}</p>

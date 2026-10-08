@@ -450,10 +450,17 @@ function formatDate(dateStr) {
                                     <td class="px-5 py-3.5">
                                         <div class="flex items-center gap-3">
                                             <img
-                                                :src="product.primary_image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&auto=format&fit=crop&q=60'"
+                                                v-if="product.primary_image"
+                                                :src="product.primary_image"
                                                 alt="Thumb"
                                                 class="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100"
                                             />
+                                            <div
+                                                v-else
+                                                class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center text-slate-400"
+                                            >
+                                                <Package class="w-5 h-5" />
+                                            </div>
                                             <div>
                                                 <p class="font-bold text-slate-900 dark:text-white text-xs">{{ product.name }}</p>
                                                 <div class="flex items-center gap-1.5 mt-0.5">
@@ -529,10 +536,17 @@ function formatDate(dateStr) {
                                         <td class="px-5 py-3" colspan="2">
                                             <div class="flex items-center gap-3">
                                                 <img
-                                                    :src="product.primary_image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&auto=format&fit=crop&q=60'"
+                                                    v-if="product.primary_image"
+                                                    :src="product.primary_image"
                                                     alt="Thumb"
                                                     class="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100"
                                                 />
+                                                <div
+                                                    v-else
+                                                    class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center text-slate-400"
+                                                >
+                                                    <Package class="w-4 h-4" />
+                                                </div>
                                                 <div>
                                                     <div class="flex items-center gap-2">
                                                         <span class="font-bold text-slate-900 dark:text-white text-xs">{{ product.name }}</span>

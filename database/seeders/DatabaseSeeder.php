@@ -494,5 +494,8 @@ class DatabaseSeeder extends Seeder
 
         // 8. Seed Roles & Permissions
         $this->call(RolesAndPermissionsSeeder::class);
+
+        // 9. Seed Full Cloth & Lifestyle Storefront Catalog
+        $this->call(ClothStorefrontSeeder::class);
     }
 }

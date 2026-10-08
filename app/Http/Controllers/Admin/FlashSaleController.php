@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FlashSale;
 use App\Models\FlashSaleItem;
 use App\Models\Product;
+use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,13 @@ class FlashSaleController extends Controller
             'flashSales' => $sales,
             'metrics' => $metrics,
             'availableProducts' => $products,
+            'navigationMenu' => Setting::get('navigation_menu', [
+                ['label' => 'HOME', 'href' => '/', 'highlight' => false],
+                ['label' => 'Loomora Fest70', 'href' => '/festival-26', 'highlight' => true],
+                ['label' => 'PUJA-2026', 'href' => '/puja-2026', 'highlight' => false],
+                ['label' => 'Budget Picks', 'href' => '/budget-picks', 'highlight' => false],
+                ['label' => 'Best Deals', 'href' => '/best-deals', 'highlight' => true],
+            ]),
         ]);
     }
 
@@ -178,6 +186,20 @@ class FlashSaleController extends Controller
         return response()->json([
             'url' => asset('storage/'.$path),
         ]);
+    }
+
+    public function updateNavigationMenu(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'navigation_menu' => 'required|array',
+            'navigation_menu.*.label' => 'required|string|max:100',
+            'navigation_menu.*.href' => 'required|string|max:255',
+            'navigation_menu.*.highlight' => 'nullable|boolean',
+        ]);
+
+        Setting::set('navigation_menu', $request->input('navigation_menu'), 'json', 'general');
+
+        return redirect()->back()->with('success', 'Storefront header navigation links updated successfully.');
     }
 
     public function destroy(FlashSale $flashSale): RedirectResponse

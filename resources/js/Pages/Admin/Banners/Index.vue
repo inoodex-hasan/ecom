@@ -42,6 +42,7 @@ const placementOptions = [
     { value: 'hero_slider', label: 'Hero Carousel Slider' },
     { value: 'home_banner', label: 'Mid-Page Promo Banner' },
     { value: 'category_banner', label: 'Category Header Banner' },
+    { value: 'home_video', label: 'Showcase Video Banner' },
     { value: 'popup_promo', label: 'Popup Promotional Modal' },
 ];
 
@@ -134,7 +135,7 @@ function handleImageUpload(e, isMobile = false) {
     const data = new FormData();
     data.append('image', file);
 
-    axios.post(route('admin.banners.upload-image'), data, {
+    axios.post(route('admin.banners.upload-image', undefined, false) || '/admin/banners/upload-image', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
     })
     .then(res => {
@@ -191,6 +192,7 @@ function formatPlacement(placement) {
         hero_slider: 'Hero Slider',
         home_banner: 'Mid-Page Promo',
         category_banner: 'Category Header',
+        home_video: 'Showcase Video',
         popup_promo: 'Popup Modal',
     };
     return map[placement] || placement;
@@ -337,7 +339,17 @@ function formatPlacement(placement) {
                 >
                     <!-- Visual Card Simulation Preview -->
                     <div class="relative h-56 w-full bg-slate-900 overflow-hidden">
+                        <video
+                            v-if="banner.placement === 'home_video' || banner.image_url?.endsWith('.mp4') || banner.image_url?.endsWith('.webm')"
+                            :src="banner.image_url"
+                            muted
+                            loop
+                            autoplay
+                            playsinline
+                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                        />
                         <img
+                            v-else
                             :src="banner.image_url"
                             :alt="banner.title"
                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
@@ -525,18 +537,29 @@ function formatPlacement(placement) {
                             </div>
                         </div>
 
-                        <!-- Desktop Banner Image Upload -->
+                        <!-- Desktop Banner Image / Video Upload -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Desktop Banner Image (1920x600 recommended) *</label>
+                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                                {{ form.placement === 'home_video' ? 'Showcase Video File (MP4/WebM) *' : 'Desktop Banner Image (1920x600 recommended) *' }}
+                            </label>
                             <div v-if="form.image_url" class="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 h-32 bg-slate-900 group">
-                                <img :src="form.image_url" class="w-full h-full object-cover" />
+                                <video
+                                    v-if="form.placement === 'home_video' || form.image_url?.endsWith('.mp4') || form.image_url?.endsWith('.webm')"
+                                    :src="form.image_url"
+                                    muted
+                                    loop
+                                    autoplay
+                                    playsinline
+                                    class="w-full h-full object-cover"
+                                />
+                                <img v-else :src="form.image_url" class="w-full h-full object-cover" />
                                 <div class="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <button
                                         type="button"
                                         @click="form.image_url = ''"
-                                        class="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center gap-1"
+                                        class="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
                                     >
-                                        <Trash2 class="w-3.5 h-3.5" /> Replace Image
+                                        <Trash2 class="w-3.5 h-3.5" /> Replace Media
                                     </button>
                                 </div>
                             </div>
@@ -544,11 +567,13 @@ function formatPlacement(placement) {
                                 v-else
                                 class="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-2xl p-4 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/40"
                             >
-                                <div v-if="isUploadingDesktop" class="py-2 text-indigo-600 font-bold text-xs">Uploading desktop banner...</div>
+                                <div v-if="isUploadingDesktop" class="py-2 text-indigo-600 font-bold text-xs">Uploading media...</div>
                                 <label v-else class="cursor-pointer block">
                                     <UploadCloud class="w-6 h-6 text-slate-400 mx-auto mb-1" />
-                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Upload Desktop Banner</span>
-                                    <input type="file" accept="image/*" @change="handleImageUpload($event, false)" class="hidden" />
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                        {{ form.placement === 'home_video' ? 'Upload Video (MP4 / WebM)' : 'Upload Media (Image or Video)' }}
+                                    </span>
+                                    <input type="file" accept="image/*,video/mp4,video/webm" @change="handleImageUpload($event, false)" class="hidden" />
                                 </label>
                             </div>
                         </div>

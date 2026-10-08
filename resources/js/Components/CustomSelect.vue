@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { ChevronDown, Check } from 'lucide-vue-next';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ChevronDown, Check, Search, X } from 'lucide-vue-next';
 
 const props = defineProps({
     modelValue: {
@@ -39,6 +39,14 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    searchable: {
+        type: Boolean,
+        default: false,
+    },
+    searchPlaceholder: {
+        type: String,
+        default: 'Type to filter...',
+    },
     triggerClass: {
         type: String,
         default: '',
@@ -57,6 +65,8 @@ const emit = defineEmits(['update:modelValue', 'change']);
 
 const isOpen = ref(false);
 const selectRef = ref(null);
+const searchInputRef = ref(null);
+const searchQuery = ref('');
 
 // Normalize options to { value, label, sublabel, icon, raw }
 const normalizedOptions = computed(() => {
@@ -89,6 +99,28 @@ const displayLabel = computed(() => {
         return selectedOption.value.label;
     }
     return props.placeholder;
+});
+
+const filteredOptions = computed(() => {
+    if (!props.searchable || !searchQuery.value.trim()) {
+        return normalizedOptions.value;
+    }
+    const q = searchQuery.value.toLowerCase().trim();
+    return normalizedOptions.value.filter(opt => {
+        const matchLabel = opt.label && String(opt.label).toLowerCase().includes(q);
+        const matchSublabel = opt.sublabel && String(opt.sublabel).toLowerCase().includes(q);
+        return matchLabel || matchSublabel;
+    });
+});
+
+watch(isOpen, (open) => {
+    if (!open) {
+        searchQuery.value = '';
+    } else if (props.searchable) {
+        setTimeout(() => {
+            searchInputRef.value?.focus();
+        }, 50);
+    }
 });
 
 function toggleDropdown() {
@@ -181,44 +213,77 @@ onBeforeUnmount(() => {
             <div
                 v-if="isOpen"
                 :class="[
-                    'absolute left-0 right-0 mt-2 min-w-[200px] w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 space-y-1 max-h-60 overflow-y-auto focus:outline-hidden',
+                    'absolute left-0 right-0 mt-2 min-w-[220px] w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden focus:outline-hidden',
                     menuClass
                 ]"
             >
-                <button
-                    v-for="(opt, idx) in normalizedOptions"
-                    :key="idx"
-                    type="button"
-                    @click="selectOption(opt)"
-                    :class="[
-                        'w-full flex items-center justify-between p-2 rounded-xl text-xs text-left transition-colors cursor-pointer',
-                        String(opt.value) === String(modelValue)
-                            ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'
-                    ]"
-                >
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                        <component
-                            :is="opt.icon"
-                            v-if="opt.icon"
-                            :class="[
-                                'w-4 h-4 shrink-0',
-                                String(opt.value) === String(modelValue) ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
-                            ]"
+                <!-- Search Box if searchable is true -->
+                <div v-if="searchable" class="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
+                    <div class="relative">
+                        <Search class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                            ref="searchInputRef"
+                            v-model="searchQuery"
+                            type="text"
+                            :placeholder="searchPlaceholder"
+                            @click.stop
+                            class="w-full pl-8 pr-7 py-1.5 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                         />
-                        <div class="min-w-0">
-                            <p class="truncate leading-tight">{{ opt.label }}</p>
-                            <p v-if="opt.sublabel" class="text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate">
-                                {{ opt.sublabel }}
-                            </p>
-                        </div>
+                        <button
+                            v-if="searchQuery"
+                            type="button"
+                            @click.stop="searchQuery = ''"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X class="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Options List -->
+                <div class="p-1.5 space-y-1 max-h-60 overflow-y-auto">
+                    <div
+                        v-if="filteredOptions.length === 0"
+                        class="p-3 text-center text-xs text-slate-400"
+                    >
+                        No matching options found
                     </div>
 
-                    <Check
-                        v-if="String(opt.value) === String(modelValue)"
-                        class="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 ml-2"
-                    />
-                </button>
+                    <button
+                        v-for="(opt, idx) in filteredOptions"
+                        :key="idx"
+                        type="button"
+                        @click="selectOption(opt)"
+                        :class="[
+                            'w-full flex items-center justify-between p-2 rounded-xl text-xs text-left transition-colors cursor-pointer',
+                            String(opt.value) === String(modelValue)
+                                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
+                                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium'
+                        ]"
+                    >
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <component
+                                :is="opt.icon"
+                                v-if="opt.icon"
+                                :class="[
+                                    'w-4 h-4 shrink-0',
+                                    String(opt.value) === String(modelValue) ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+                                ]"
+                            />
+                            <div class="min-w-0">
+                                <p class="truncate leading-tight">{{ opt.label }}</p>
+                                <p v-if="opt.sublabel" class="text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate">
+                                    {{ opt.sublabel }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <Check
+                            v-if="String(opt.value) === String(modelValue)"
+                            class="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 ml-2"
+                        />
+                    </button>
+                </div>
             </div>
         </transition>
     </div>

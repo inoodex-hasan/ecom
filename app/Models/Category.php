@@ -51,4 +51,20 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Get all descendant category IDs (children, grandchildren, etc.) including self.
+     *
+     * @return array<int>
+     */
+    public function getAllDescendantIds(): array
+    {
+        $ids = [$this->id];
+        $children = self::where('parent_id', $this->id)->get();
+        foreach ($children as $child) {
+            $ids = array_merge($ids, $child->getAllDescendantIds());
+        }
+
+        return array_unique($ids);
+    }
 }

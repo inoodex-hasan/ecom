@@ -227,4 +227,77 @@ class StaffController extends Controller
 
         return redirect()->back()->with('success', 'Role Permissions Matrix updated successfully.');
     }
+
+    public function storeRole(Request $request): RedirectResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            abort(403, 'Only Super Admins can create new roles.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100', 'unique:roles,name'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
+        ]);
+
+        $role = Role::create([
+            'name' => $validated['name'],
+            'guard_name' => 'web',
+        ]);
+
+        if (! empty($validated['permissions'])) {
+            $role->syncPermissions($validated['permissions']);
+        }
+
+        return redirect()->back()->with('success', "Role '{$role->name}' created successfully.");
+    }
+
+    public function updateRole(Request $request, Role $role): RedirectResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            abort(403, 'Only Super Admins can update roles.');
+        }
+
+        if ($role->name === 'Super Admin' && $request->input('name') !== 'Super Admin') {
+            return redirect()->back()->with('error', 'Super Admin role name cannot be modified.');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100', Rule::unique('roles', 'name')->ignore($role->id)],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
+        ]);
+
+        $role->update(['name' => $validated['name']]);
+
+        if ($role->name === 'Super Admin') {
+            $role->syncPermissions(Permission::all());
+        } elseif (isset($validated['permissions'])) {
+            $role->syncPermissions($validated['permissions']);
+        }
+
+        return redirect()->back()->with('success', "Role '{$role->name}' updated successfully.");
+    }
+
+    public function destroyRole(Request $request, Role $role): RedirectResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            abort(403, 'Only Super Admins can delete roles.');
+        }
+
+        if (in_array($role->name, ['Super Admin', 'customer'])) {
+            return redirect()->back()->with('error', "System core role '{$role->name}' cannot be deleted.");
+        }
+
+        $userCount = $role->users()->count();
+        if ($userCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete role '{$role->name}' because {$userCount} team member(s) are assigned to it. Please reassign them first.");
+        }
+
+        $roleName = $role->name;
+        $role->permissions()->detach();
+        $role->delete();
+
+        return redirect()->back()->with('success', "Role '{$roleName}' deleted successfully.");
+    }
 }

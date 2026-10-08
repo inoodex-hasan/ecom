@@ -35,6 +35,7 @@ class InitController extends Controller
             'free_shipping_threshold' => (float) Setting::get('shipping.free_shipping_threshold', 100),
             'default_shipping_fee' => (float) Setting::get('shipping.default_fee', 10),
             'announcement_bar' => Setting::get('marketing.announcement_text', 'Free nationwide express shipping on all orders over ৳1,000!'),
+            'navigation_menu' => Setting::get('navigation_menu', []),
         ];
 
         return response()->json([

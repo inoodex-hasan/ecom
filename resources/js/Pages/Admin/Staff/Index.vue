@@ -44,7 +44,8 @@ import {
     Newspaper,
     LayoutGrid,
     Sliders,
-    ArrowRight
+    ArrowRight,
+    Plus
 } from 'lucide-vue-next';
 import CustomSelect from '@/Components/CustomSelect.vue';
 
@@ -89,6 +90,94 @@ const selectedFocusRoleId = ref(
 const selectedFocusRole = computed(() => {
     return props.roles.find(r => r.id === selectedFocusRoleId.value) || props.roles[0];
 });
+
+// Role Create / Edit Modal State
+const isRoleModalOpen = ref(false);
+const editingRole = ref(null);
+
+const roleForm = useForm({
+    name: '',
+    permissions: [],
+});
+
+function openCreateRoleModal() {
+    editingRole.value = null;
+    roleForm.reset();
+    roleForm.clearErrors();
+    roleForm.name = '';
+    roleForm.permissions = [];
+    isRoleModalOpen.value = true;
+}
+
+function openEditRoleModal(role) {
+    editingRole.value = role;
+    roleForm.reset();
+    roleForm.clearErrors();
+    roleForm.name = role.name;
+    const currentEntry = matrixState.value.find(r => r.role_id === role.id);
+    roleForm.permissions = [...(currentEntry?.permissions || role.permissions?.map(p => p.name) || [])];
+    isRoleModalOpen.value = true;
+}
+
+function toggleRoleFormPermission(permName) {
+    const idx = roleForm.permissions.indexOf(permName);
+    if (idx >= 0) {
+        roleForm.permissions.splice(idx, 1);
+    } else {
+        roleForm.permissions.push(permName);
+    }
+}
+
+function toggleRoleFormModule(moduleName) {
+    const modulePerms = (props.groupedPermissions[moduleName] || []).map(p => p.name);
+    const allSelected = modulePerms.every(p => roleForm.permissions.includes(p));
+    if (allSelected) {
+        roleForm.permissions = roleForm.permissions.filter(p => !modulePerms.includes(p));
+    } else {
+        const set = new Set([...roleForm.permissions, ...modulePerms]);
+        roleForm.permissions = Array.from(set);
+    }
+}
+
+function selectAllRoleFormPermissions() {
+    const all = Object.values(props.groupedPermissions).flatMap(g => g.map(p => p.name));
+    roleForm.permissions = [...all];
+}
+
+function clearAllRoleFormPermissions() {
+    roleForm.permissions = [];
+}
+
+function submitRoleModal() {
+    if (editingRole.value) {
+        roleForm.put(route('admin.roles.update', editingRole.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                isRoleModalOpen.value = false;
+            },
+        });
+    } else {
+        roleForm.post(route('admin.roles.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                isRoleModalOpen.value = false;
+            },
+        });
+    }
+}
+
+function deleteRole(role) {
+    if (confirm(`Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`)) {
+        router.delete(route('admin.roles.destroy', role.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (selectedFocusRoleId.value === role.id) {
+                    selectedFocusRoleId.value = props.roles.find(r => r.id !== role.id)?.id || null;
+                }
+            },
+        });
+    }
+}
 
 // Matrix changes calculation
 const matrixChangesCount = computed(() => {
@@ -1044,8 +1133,16 @@ const formatDate = (dateStr) => {
                                 </button>
                             </div>
 
-                            <!-- Reset & Save Buttons -->
+                            <!-- Reset, New Role & Save Buttons -->
                             <div class="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    @click="openCreateRoleModal"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
+                                >
+                                    <Plus class="w-4 h-4" />
+                                    <span>New Role</span>
+                                </button>
                                 <button
                                     v-if="isMatrixDirty"
                                     type="button"
@@ -1060,7 +1157,7 @@ const formatDate = (dateStr) => {
                                     @click="saveMatrix"
                                     :class="[
                                         isMatrixDirty
-                                            ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 ring-2 ring-indigo-500/20'
+                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 ring-2 ring-emerald-500/20'
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed',
                                         'inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer'
                                     ]"
@@ -1161,14 +1258,14 @@ const formatDate = (dateStr) => {
                                                 </span>
                                             </div>
 
-                                            <div class="flex items-center gap-2 pt-0.5">
+                                            <div class="flex items-center gap-1.5 pt-0.5 flex-wrap justify-center">
                                                 <button
                                                     v-if="role.name !== 'Super Admin'"
                                                     type="button"
                                                     @click="toggleAllForRole(role.id)"
                                                     class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                                                 >
-                                                    Toggle All
+                                                    Toggle
                                                 </button>
                                                 <span v-if="role.name !== 'Super Admin'" class="text-slate-300 dark:text-slate-700 text-[10px]">·</span>
                                                 <button
@@ -1178,6 +1275,26 @@ const formatDate = (dateStr) => {
                                                 >
                                                     Inspect
                                                 </button>
+                                                <template v-if="role.name !== 'Super Admin'">
+                                                    <span class="text-slate-300 dark:text-slate-700 text-[10px]">·</span>
+                                                    <button
+                                                        type="button"
+                                                        @click="openEditRoleModal(role)"
+                                                        class="text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                                                        title="Edit role name & permissions"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <span class="text-slate-300 dark:text-slate-700 text-[10px]">·</span>
+                                                    <button
+                                                        type="button"
+                                                        @click="deleteRole(role)"
+                                                        class="text-[10px] font-semibold text-rose-500 hover:underline cursor-pointer"
+                                                        title="Delete role"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </template>
                                             </div>
                                         </div>
                                     </th>
@@ -1398,9 +1515,28 @@ const formatDate = (dateStr) => {
                                 </p>
                             </div>
 
-                            <!-- Bulk Action Buttons -->
-                            <div v-if="selectedFocusRole.name !== 'Super Admin'" class="flex items-center gap-2">
+                            <!-- Bulk Action & Edit Buttons -->
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <template v-if="selectedFocusRole.name !== 'Super Admin'">
+                                    <button
+                                        type="button"
+                                        @click="openEditRoleModal(selectedFocusRole)"
+                                        class="px-3.5 py-2 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Edit3 class="w-3.5 h-3.5" />
+                                        <span>Edit Role</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="deleteRole(selectedFocusRole)"
+                                        class="px-3.5 py-2 rounded-2xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Trash2 class="w-3.5 h-3.5" />
+                                        <span>Delete Role</span>
+                                    </button>
+                                </template>
                                 <button
+                                    v-if="selectedFocusRole.name !== 'Super Admin'"
                                     type="button"
                                     @click="grantAllForRole(selectedFocusRole.id)"
                                     class="px-3.5 py-2 rounded-2xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
@@ -1408,6 +1544,7 @@ const formatDate = (dateStr) => {
                                     Grant All
                                 </button>
                                 <button
+                                    v-if="selectedFocusRole.name !== 'Super Admin'"
                                     type="button"
                                     @click="revokeAllForRole(selectedFocusRole.id)"
                                     class="px-3.5 py-2 rounded-2xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer"
@@ -1574,6 +1711,154 @@ const formatDate = (dateStr) => {
                         </div>
                     </div>
                 </transition>
+            </div>
+        </div>
+
+        <!-- Role Create / Edit Modal Dialog -->
+        <div v-if="isRoleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity" @click="isRoleModalOpen = false"></div>
+
+            <div class="relative bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col z-10">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                            <ShieldCheck class="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-slate-900 dark:text-white">
+                                {{ editingRole ? `Edit Role: ${editingRole.name}` : 'Create New Security Role' }}
+                            </h3>
+                            <p class="text-xs text-slate-400">
+                                {{ editingRole ? 'Update the role title and modify its assigned permissions.' : 'Define a new role and configure its baseline operational permissions.' }}
+                            </p>
+                        </div>
+                    </div>
+                    <button @click="isRoleModalOpen = false" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                        <X class="w-4 h-4" />
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <form @submit.prevent="submitRoleModal" class="flex-1 overflow-y-auto p-6 space-y-6">
+                    <!-- Role Name Input -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                            Role Name *
+                        </label>
+                        <input
+                            v-model="roleForm.name"
+                            type="text"
+                            placeholder="e.g. Inventory Supervisor, Marketing Manager, Support Lead"
+                            :disabled="editingRole?.name === 'Super Admin'"
+                            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            required
+                        />
+                        <p v-if="roleForm.errors.name" class="mt-1 text-xs text-rose-500 font-medium">
+                            {{ roleForm.errors.name }}
+                        </p>
+                    </div>
+
+                    <!-- Permission Matrix Selection in Modal -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Assigned Capabilities
+                                </h4>
+                                <p class="text-[11px] text-slate-400">
+                                    {{ roleForm.permissions.length }} of {{ totalPermissionsCount }} permissions selected
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    @click="selectAllRoleFormPermissions"
+                                    class="px-2.5 py-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg cursor-pointer"
+                                >
+                                    Select All
+                                </button>
+                                <span class="text-slate-300 dark:text-slate-700">·</span>
+                                <button
+                                    type="button"
+                                    @click="clearAllRoleFormPermissions"
+                                    class="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-lg cursor-pointer"
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Module by Module Selector -->
+                        <div class="space-y-3">
+                            <div
+                                v-for="(perms, moduleKey) in groupedPermissions"
+                                :key="moduleKey"
+                                class="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30"
+                            >
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-2">
+                                        <component :is="getModuleIcon(moduleKey)" class="w-4 h-4 text-indigo-500" />
+                                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                            {{ moduleMeta[moduleKey]?.title || moduleKey }}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="toggleRoleFormModule(moduleKey)"
+                                        class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                    >
+                                        Toggle Module
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <label
+                                        v-for="p in perms"
+                                        :key="p.name"
+                                        class="flex items-start gap-2 p-2 rounded-xl hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200/60 dark:hover:border-slate-700/60 transition-colors cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            :value="p.name"
+                                            :checked="roleForm.permissions.includes(p.name)"
+                                            @change="toggleRoleFormPermission(p.name)"
+                                            class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                                        />
+                                        <div>
+                                            <p class="text-xs font-medium text-slate-800 dark:text-slate-200 leading-tight">
+                                                {{ getPermissionMeta(p.name).title }}
+                                            </p>
+                                            <p class="text-[10px] text-slate-400 leading-tight mt-0.5">
+                                                {{ getPermissionMeta(p.name).description }}
+                                            </p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 flex items-center justify-end gap-2.5">
+                    <button
+                        type="button"
+                        @click="isRoleModalOpen = false"
+                        class="px-4 py-2 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        :disabled="roleForm.processing"
+                        @click="submitRoleModal"
+                        class="px-5 py-2 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                        <Loader2 v-if="roleForm.processing" class="w-4 h-4 animate-spin" />
+                        <Check v-else class="w-4 h-4" />
+                        <span>{{ editingRole ? 'Update Role' : 'Create Role' }}</span>
+                    </button>
+                </div>
             </div>
         </div>
     </AdminLayout>

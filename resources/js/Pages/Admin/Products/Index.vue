@@ -33,7 +33,9 @@ import {
     Copy,
     Tag,
     Flame,
-    Zap
+    Zap,
+    FolderTree,
+    CornerDownRight
 } from 'lucide-vue-next';
 import CustomSelect from '@/Components/CustomSelect.vue';
 import RichTextEditor from '@/Components/RichTextEditor.vue';
@@ -55,6 +57,208 @@ const isCreateModalOpen = ref(false);
 const isEditModalOpen = ref(false);
 const productToEdit = ref(null);
 const activeModalTab = ref('general'); // 'general' | 'specs' | 'units' | 'variants'
+
+// Hierarchical Category Options for Select Dropdowns
+const categoryOptions = computed(() => {
+    const list = [{ value: '', label: 'Select Category', sublabel: null }];
+    const cats = props.categories || [];
+
+    // Separate root categories and subcategories
+    const roots = cats.filter(c => !c.parent_id);
+    const subMap = new Map();
+    cats.filter(c => c.parent_id).forEach(sub => {
+        if (!subMap.has(sub.parent_id)) subMap.set(sub.parent_id, []);
+        subMap.get(sub.parent_id).push(sub);
+    });
+
+    roots.forEach(root => {
+        // Root department option
+        list.push({
+            value: root.id,
+            label: `📁 ${root.name}`,
+            sublabel: 'Root Department',
+        });
+
+        // Child subcategories of this root
+        const children = subMap.get(root.id) || [];
+        children.forEach(child => {
+            list.push({
+                value: child.id,
+                label: `   ↳ ${child.name}`,
+                sublabel: `${root.name} Subcategory`,
+            });
+        });
+    });
+
+    // Any other categories whose parent isn't in roots
+    const rootIds = new Set(roots.map(r => r.id));
+    cats.filter(c => c.parent_id && !rootIds.has(c.parent_id)).forEach(other => {
+        list.push({
+            value: other.id,
+            label: other.parent ? `↳ ${other.name}` : other.name,
+            sublabel: other.parent ? `${other.parent.name} Subcategory` : 'Subcategory',
+        });
+    });
+
+    return list;
+});
+
+const categoryFilterOptions = computed(() => {
+    return [
+        { value: '', label: 'All Categories' },
+        ...categoryOptions.value.slice(1),
+    ];
+});
+
+// ── CASCADING CATEGORY PICKER STATE (Parent -> Sub -> Child) ──
+const selectedParentId = ref('');
+const selectedSubId = ref('');
+const selectedChildId = ref('');
+
+// Category lookup map by ID
+const categoryMap = computed(() => {
+    const map = new Map();
+    (props.categories || []).forEach(c => map.set(c.id, c));
+    return map;
+});
+
+// Root Departments (Categories with parent_id === null)
+const rootDepartmentOptions = computed(() => {
+    const options = [{ value: '', label: 'Select Department / Main Category', sublabel: null }];
+    (props.categories || [])
+        .filter(c => !c.parent_id)
+        .forEach(r => {
+            options.push({
+                value: r.id,
+                label: `📁 ${r.name}`,
+                sublabel: 'Root Department',
+            });
+        });
+    return options;
+});
+
+// Subcategories of the currently selected parent
+const subCategoryOptions = computed(() => {
+    if (!selectedParentId.value) return [];
+    const parentId = Number(selectedParentId.value);
+    const parentCat = categoryMap.value.get(parentId);
+    const options = [{ value: '', label: `Select Subcategory under ${parentCat?.name || 'Department'}`, sublabel: null }];
+
+    (props.categories || [])
+        .filter(c => c.parent_id === parentId)
+        .forEach(sub => {
+            options.push({
+                value: sub.id,
+                label: `↳ ${sub.name}`,
+                sublabel: `${parentCat?.name || ''} Subcategory`,
+            });
+        });
+    return options;
+});
+
+// Level 3 Child categories of the currently selected subcategory (if any)
+const childCategoryOptions = computed(() => {
+    if (!selectedSubId.value) return [];
+    const subId = Number(selectedSubId.value);
+    const subCat = categoryMap.value.get(subId);
+    const children = (props.categories || []).filter(c => c.parent_id === subId);
+    if (children.length === 0) return [];
+
+    const options = [{ value: '', label: `Select Specific Type under ${subCat?.name || 'Subcategory'}`, sublabel: null }];
+    children.forEach(ch => {
+        options.push({
+            value: ch.id,
+            label: `↳ ${ch.name}`,
+            sublabel: `${subCat?.name || ''} Specific Item`,
+        });
+    });
+    return options;
+});
+
+// Breadcrumb path of currently selected category
+const categoryBreadcrumb = computed(() => {
+    if (!form.category_id) return 'None';
+    const target = categoryMap.value.get(Number(form.category_id));
+    if (!target) return 'Custom';
+    const parts = [target.name];
+    let curr = target;
+    while (curr && curr.parent_id) {
+        const p = categoryMap.value.get(curr.parent_id);
+        if (p) {
+            parts.unshift(p.name);
+            curr = p;
+        } else {
+            break;
+        }
+    }
+    return parts.join(' → ');
+});
+
+function handleParentChange(newParentId) {
+    selectedParentId.value = newParentId;
+    selectedSubId.value = '';
+    selectedChildId.value = '';
+    form.category_id = newParentId || '';
+}
+
+function handleSubChange(newSubId) {
+    selectedSubId.value = newSubId;
+    selectedChildId.value = '';
+    if (newSubId) {
+        form.category_id = newSubId;
+    } else {
+        form.category_id = selectedParentId.value || '';
+    }
+}
+
+function handleChildChange(newChildId) {
+    selectedChildId.value = newChildId;
+    if (newChildId) {
+        form.category_id = newChildId;
+    } else {
+        form.category_id = selectedSubId.value || selectedParentId.value || '';
+    }
+}
+
+function initCascadingCategory(catId) {
+    selectedParentId.value = '';
+    selectedSubId.value = '';
+    selectedChildId.value = '';
+
+    if (!catId) return;
+
+    const target = categoryMap.value.get(Number(catId));
+    if (!target) {
+        selectedParentId.value = catId;
+        return;
+    }
+
+    if (!target.parent_id) {
+        // Target is Root Category (Level 1)
+        selectedParentId.value = target.id;
+    } else {
+        const parent = categoryMap.value.get(target.parent_id);
+        if (parent && !parent.parent_id) {
+            // Target is Subcategory (Level 2) under a Root
+            selectedParentId.value = parent.id;
+            selectedSubId.value = target.id;
+        } else if (parent && parent.parent_id) {
+            // Target is Child (Level 3)
+            const grandParent = categoryMap.value.get(parent.parent_id);
+            if (grandParent) {
+                selectedParentId.value = grandParent.id;
+                selectedSubId.value = parent.id;
+                selectedChildId.value = target.id;
+            } else {
+                selectedParentId.value = parent.id;
+                selectedSubId.value = target.id;
+            }
+        } else {
+            selectedParentId.value = target.parent_id;
+            selectedSubId.value = target.id;
+        }
+    }
+}
 
 // Industry Type Configurations
 const productTypes = [
@@ -131,7 +335,7 @@ const imagePreview = ref(null);
 const isUploadingImage = ref(false);
 
 async function handleImageUpload(e) {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     // Show local preview immediately
@@ -139,21 +343,36 @@ async function handleImageUpload(e) {
     reader.onload = (ev) => { imagePreview.value = ev.target.result; };
     reader.readAsDataURL(file);
 
-    // Upload to server, get back the stored URL
+    // Upload to server using same-origin relative URL
     isUploadingImage.value = true;
     const data = new FormData();
     data.append('image', file);
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const headers = { 'Content-Type': 'multipart/form-data' };
+    if (csrfToken) {
+        headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+
     try {
-        const res = await axios.post(route('admin.products.upload-image'), data, {
-            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content },
-        });
-        form.primary_image = res.data.url; // store URL string in form
+        const uploadUrl = route('admin.products.upload-image', undefined, false) || '/admin/products/upload-image';
+        const res = await axios.post(uploadUrl, data, { headers });
+        if (res.data?.url) {
+            form.primary_image = res.data.url; // store URL string in form
+            imagePreview.value = res.data.url;
+        } else {
+            throw new Error('No image URL returned from server.');
+        }
     } catch (err) {
         console.error('Image upload failed', err);
-        imagePreview.value = null;
-        form.primary_image = null;
+        alert(err.response?.data?.message || err.message || 'Image upload failed. Please try again.');
+        // Revert to existing image if upload failed
+        imagePreview.value = form.primary_image || null;
     } finally {
         isUploadingImage.value = false;
+        if (e.target) {
+            e.target.value = '';
+        }
     }
 }
 
@@ -269,6 +488,7 @@ watch(search, () => {
 
 function openCreateModal() {
     form.reset();
+    initCascadingCategory('');
     form.product_type = selectedType.value || 'standard';
     form.attributes = {};
     form.variants = [];
@@ -284,6 +504,7 @@ function openCreateModal() {
 
 function openEditModal(prod) {
     productToEdit.value = prod;
+    initCascadingCategory(prod.category_id);
     form.product_type = prod.product_type || 'standard';
     form.name = prod.name;
     form.sku = prod.sku;
@@ -333,7 +554,7 @@ function openEditModal(prod) {
         rawSpecRows.value = [{ key: '', value: '' }];
     }
 
-    imagePreview.value = null; // reset file upload preview
+    imagePreview.value = prod.primary_image || null; // set file upload preview
     activeModalTab.value = 'general';
     isEditModalOpen.value = true;
 }
@@ -470,10 +691,7 @@ const formatCurrency = (val) => {
                             <CustomSelect
                                 v-model="selectedCategory"
                                 @change="applyFilters"
-                                :options="[
-                                    { value: '', label: 'All Categories' },
-                                    ...categories.map(c => ({ value: c.id, label: c.name }))
-                                ]"
+                                :options="categoryFilterOptions"
                                 placeholder="All Categories"
                                 compact
                             />
@@ -521,14 +739,7 @@ const formatCurrency = (val) => {
                         <Download class="w-3.5 h-3.5" />
                         <span>Excel</span>
                     </a>
-                    <a
-                        :href="route('admin.products.export', { format: 'csv', product_type: selectedType || undefined, search: search || undefined, category: selectedCategory || undefined, status: selectedStatus || undefined, low_stock: onlyLowStock ? 'true' : undefined })"
-                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs transition-colors shrink-0"
-                        title="Export Products as CSV"
-                    >
-                        <Download class="w-3.5 h-3.5" />
-                        <span>CSV</span>
-                    </a>
+
                     <button
                         @click="openCreateModal"
                         class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer shrink-0"
@@ -564,10 +775,17 @@ const formatCurrency = (val) => {
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
                                         <img
-                                            :src="prod.primary_image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'"
+                                            v-if="prod.primary_image"
+                                            :src="prod.primary_image"
                                             alt="Product"
                                             class="w-12 h-12 rounded-2xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/50 dark:border-slate-700/50 shadow-xs"
                                         />
+                                        <div
+                                            v-else
+                                            class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-center text-slate-400"
+                                        >
+                                            <Package class="w-5 h-5" />
+                                        </div>
                                         <div class="truncate max-w-[200px]">
                                             <p class="text-xs font-bold text-slate-900 dark:text-white truncate">
                                                 {{ prod.name }}
@@ -878,29 +1096,88 @@ const formatCurrency = (val) => {
                             </div>
                         </div>
 
-                        <!-- Category & Brand -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                                <CustomSelect
-                                    v-model="form.category_id"
-                                    :options="[
-                                        { value: '', label: 'Select Category' },
-                                        ...categories.map(cat => ({ value: cat.id, label: cat.name }))
-                                    ]"
-                                    placeholder="Select Category"
-                                />
+                        <!-- Multi-Level Cascading Category & Brand Selector -->
+                        <div class="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-750 space-y-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <label class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                    <FolderTree class="w-3.5 h-3.5 text-indigo-500" />
+                                    <span>Product Classification & Taxonomy</span>
+                                </label>
+                                <div v-if="form.category_id" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 self-start sm:self-auto">
+                                    <span class="text-slate-400">Current:</span>
+                                    <span class="font-semibold">{{ categoryBreadcrumb }}</span>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Brand / Manufacturer</label>
-                                <CustomSelect
-                                    v-model="form.brand_id"
-                                    :options="[
-                                        { value: '', label: 'Select Brand' },
-                                        ...brands.map(brand => ({ value: brand.id, label: brand.name }))
-                                    ]"
-                                    placeholder="Select Brand"
-                                />
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <!-- Step 1: Main Department / Parent -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1 flex items-center justify-between">
+                                        <span>1. Main Department *</span>
+                                        <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-normal">Level 1</span>
+                                    </label>
+                                    <CustomSelect
+                                        :model-value="selectedParentId"
+                                        @update:model-value="handleParentChange"
+                                        :options="rootDepartmentOptions"
+                                        placeholder="Select Department"
+                                        searchable
+                                        search-placeholder="Search department..."
+                                    />
+                                </div>
+
+                                <!-- Step 2: Subcategory -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1 flex items-center justify-between">
+                                        <span>2. Subcategory</span>
+                                        <span class="text-[10px] text-slate-400 font-normal">Level 2</span>
+                                    </label>
+                                    <CustomSelect
+                                        :model-value="selectedSubId"
+                                        @update:model-value="handleSubChange"
+                                        :options="subCategoryOptions"
+                                        :placeholder="selectedParentId ? 'Select Subcategory' : 'Choose Department first'"
+                                        :disabled="!selectedParentId || subCategoryOptions.length <= 1"
+                                        searchable
+                                        search-placeholder="Search subcategory..."
+                                    />
+                                </div>
+
+                                <!-- Brand / Manufacturer -->
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1 flex items-center justify-between">
+                                        <span>Brand / Manufacturer</span>
+                                        <span class="text-[10px] text-slate-400 font-normal">Optional</span>
+                                    </label>
+                                    <CustomSelect
+                                        v-model="form.brand_id"
+                                        :options="[
+                                            { value: '', label: 'No Brand / Generic' },
+                                            ...brands.map(brand => ({ value: brand.id, label: brand.name }))
+                                        ]"
+                                        placeholder="Select Brand"
+                                        searchable
+                                        search-placeholder="Search brand..."
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Specific Child Category (Only visible if subcategory has children) -->
+                            <div v-if="childCategoryOptions.length > 1" class="pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                <div class="max-w-md">
+                                    <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+                                        <CornerDownRight class="w-3 h-3 text-indigo-500" />
+                                        <span>3. Specific Item Type (Child of Subcategory)</span>
+                                    </label>
+                                    <CustomSelect
+                                        :model-value="selectedChildId"
+                                        @update:model-value="handleChildChange"
+                                        :options="childCategoryOptions"
+                                        placeholder="Select Specific Type"
+                                        searchable
+                                        search-placeholder="Search specific item..."
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1551,10 +1828,11 @@ const formatCurrency = (val) => {
                             </button>
                             <button
                                 type="submit"
-                                :disabled="form.processing"
-                                class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                                :disabled="form.processing || isUploadingImage"
+                                class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
                             >
-                                {{ isEditModalOpen ? 'Save Changes' : 'Create Product' }}
+                                <span v-if="isUploadingImage">Uploading image...</span>
+                                <span v-else>{{ isEditModalOpen ? 'Save Changes' : 'Create Product' }}</span>
                             </button>
                         </div>
                     </div>

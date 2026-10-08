@@ -99,6 +99,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::post('/campaigns/upload-image', [FlashSaleController::class, 'uploadImage'])->name('campaigns.upload-image')->middleware('can:promotions.manage');
     Route::put('/campaigns/{flashSale}', [FlashSaleController::class, 'update'])->name('campaigns.update')->middleware('can:promotions.manage');
     Route::patch('/campaigns/{flashSale}/toggle-status', [FlashSaleController::class, 'toggleStatus'])->name('campaigns.toggle-status')->middleware('can:promotions.manage');
+    Route::post('/campaigns/navigation-menu', [FlashSaleController::class, 'updateNavigationMenu'])->name('campaigns.navigation-menu')->middleware('can:promotions.manage');
     Route::delete('/campaigns/{flashSale}', [FlashSaleController::class, 'destroy'])->name('campaigns.destroy')->middleware('can:promotions.manage');
 
     // Legacy flash-sales redirects & aliases
@@ -145,6 +146,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit')->middleware('can:staff.manage');
     Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update')->middleware('can:staff.manage');
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy')->middleware('can:staff.manage');
+    Route::post('/roles', [StaffController::class, 'storeRole'])->name('roles.store')->middleware('can:staff.manage');
+    Route::put('/roles/{role}', [StaffController::class, 'updateRole'])->name('roles.update')->middleware('can:staff.manage');
+    Route::delete('/roles/{role}', [StaffController::class, 'destroyRole'])->name('roles.destroy')->middleware('can:staff.manage');
     Route::post('/roles/{role}/permissions', [StaffController::class, 'updateRolePermissions'])->name('roles.update-permissions')->middleware('can:staff.manage');
     Route::post('/roles/bulk-permissions', [StaffController::class, 'bulkUpdateRolePermissions'])->name('roles.bulk-update')->middleware('can:staff.manage');
 

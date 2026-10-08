@@ -21,13 +21,25 @@ import {
     Percent,
     AlertCircle,
     TrendingUp,
-    Timer
+    Timer,
+    Package,
+    Compass,
+    RotateCcw,
+    ArrowUp,
+    ArrowDown,
+    Pin,
+    Save,
+    Loader2,
+    Sparkles,
+    ExternalLink,
+    Eye
 } from 'lucide-vue-next';
 
 const props = defineProps({
     flashSales: Array,
     metrics: Object,
     availableProducts: Array,
+    navigationMenu: Array,
 });
 
 // Filters
@@ -218,7 +230,7 @@ function handleBannerUpload(e) {
     const data = new FormData();
     data.append('image', file);
 
-    axios.post(route('admin.campaigns.upload-image'), data, {
+    axios.post(route('admin.campaigns.upload-image', undefined, false) || '/admin/campaigns/upload-image', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
     })
     .then(res => {
@@ -270,6 +282,87 @@ function deleteSale(sale) {
         });
     }
 }
+
+// Header Navbar Links Management
+const activeTab = ref('campaigns'); // 'campaigns' | 'navbar'
+
+const initialNav = (() => {
+    const raw = props.navigationMenu;
+    if (raw && Array.isArray(raw) && raw.length > 0) {
+        return JSON.parse(JSON.stringify(raw));
+    }
+    return [
+        { label: 'HOME', href: '/', highlight: false },
+        { label: 'Loomora Fest70', href: '/festival-26', highlight: true },
+        { label: 'PUJA-2026', href: '/puja-2026', highlight: false },
+        { label: 'Budget Picks', href: '/budget-picks', highlight: false },
+        { label: 'Best Deals', href: '/best-deals', highlight: true },
+    ];
+})();
+
+const navigationItems = ref(initialNav);
+const isSavingNav = ref(false);
+
+function addNavItem(label = 'New Link', href = '/new-in', highlight = false) {
+    navigationItems.value.push({ label, href, highlight });
+}
+
+function pinCampaignToNavbar(sale) {
+    const href = sale.slug ? `/campaigns/${sale.slug}` : `/new-in`;
+    const existing = navigationItems.value.find(
+        item => item.href === href || item.label.toLowerCase() === sale.title.toLowerCase()
+    );
+    if (existing) {
+        existing.highlight = true;
+    } else {
+        navigationItems.value.push({
+            label: sale.title,
+            href: href,
+            highlight: true,
+        });
+    }
+    activeTab.value = 'navbar';
+}
+
+function removeNavItem(index) {
+    navigationItems.value.splice(index, 1);
+}
+
+function moveNavItemUp(index) {
+    if (index > 0) {
+        const item = navigationItems.value.splice(index, 1)[0];
+        navigationItems.value.splice(index - 1, 0, item);
+    }
+}
+
+function moveNavItemDown(index) {
+    if (index < navigationItems.value.length - 1) {
+        const item = navigationItems.value.splice(index, 1)[0];
+        navigationItems.value.splice(index + 1, 0, item);
+    }
+}
+
+function resetNavItems() {
+    navigationItems.value = [
+        { label: 'HOME', href: '/', highlight: false },
+        { label: 'Loomora Fest70', href: '/festival-26', highlight: true },
+        { label: 'PUJA-2026', href: '/puja-2026', highlight: false },
+        { label: 'Budget Picks', href: '/budget-picks', highlight: false },
+        { label: 'Best Deals', href: '/best-deals', highlight: true },
+    ];
+}
+
+function saveNavigationMenu() {
+    isSavingNav.value = true;
+    router.post(route('admin.campaigns.navigation-menu'), {
+        navigation_menu: navigationItems.value,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            isSavingNav.value = false;
+        },
+    });
+}
 </script>
 
 <template>
@@ -290,8 +383,53 @@ function deleteSale(sale) {
         </template>
 
         <div class="space-y-6 pb-12">
-            <!-- Metric KPI Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Navigation Tabs -->
+            <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                <button
+                    type="button"
+                    @click="activeTab = 'campaigns'"
+                    :class="[
+                        activeTab === 'campaigns'
+                            ? 'bg-amber-500 text-white shadow-sm font-bold'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 font-semibold',
+                        'px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all cursor-pointer'
+                    ]"
+                >
+                    <Zap class="w-4 h-4" />
+                    <span>Promotional Campaigns</span>
+                    <span
+                        :class="activeTab === 'campaigns' ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                    >
+                        {{ flashSales.length }}
+                    </span>
+                </button>
+
+                <button
+                    type="button"
+                    @click="activeTab = 'navbar'"
+                    :class="[
+                        activeTab === 'navbar'
+                            ? 'bg-indigo-600 text-white shadow-sm font-bold'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 font-semibold',
+                        'px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition-all cursor-pointer'
+                    ]"
+                >
+                    <Compass class="w-4 h-4" />
+                    <span>Storefront Header Navbar</span>
+                    <span
+                        :class="activeTab === 'navbar' ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                    >
+                        {{ navigationItems.length }}
+                    </span>
+                </button>
+            </div>
+
+            <!-- ================= PROMOTIONAL CAMPAIGNS TAB ================= -->
+            <div v-if="activeTab === 'campaigns'" class="space-y-6">
+                <!-- Metric KPI Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs">
                     <div class="flex items-center justify-between">
                         <div>
@@ -440,18 +578,21 @@ function deleteSale(sale) {
                             </div>
                         </div>
 
-                        <!-- Live Countdown Pill -->
-                        <div class="flex items-center gap-4">
-                            <div class="px-4 py-2 rounded-2xl bg-slate-950 text-white flex items-center gap-2.5 shadow-sm border border-slate-800">
-                                <Timer class="w-4 h-4 text-amber-400 animate-spin" style="animation-duration: 4s;" />
-                                <div>
-                                    <span class="text-[9px] uppercase tracking-wider text-slate-400 block -mb-0.5">
-                                        {{ getCountdown(sale).label }}
-                                    </span>
-                                    <span class="font-mono text-sm font-black text-amber-400">
-                                        {{ getCountdown(sale).text }}
-                                    </span>
-                                </div>
+                        <!-- Minimal Countdown Badge -->
+                        <div class="flex items-center gap-3">
+                            <div
+                                :class="[
+                                    getCountdown(sale).status === 'running'
+                                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25'
+                                        : (getCountdown(sale).status === 'upcoming'
+                                            ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/25'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'),
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border shadow-2xs'
+                                ]"
+                            >
+                                <Clock class="w-3.5 h-3.5 shrink-0 opacity-80" />
+                                <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400">{{ getCountdown(sale).label }}</span>
+                                <span class="font-mono font-bold tracking-tight">{{ getCountdown(sale).text }}</span>
                             </div>
 
                             <button
@@ -471,6 +612,13 @@ function deleteSale(sale) {
                             </button>
 
                             <div class="flex items-center gap-1">
+                                <button
+                                    @click="pinCampaignToNavbar(sale)"
+                                    class="p-2 rounded-xl text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                    title="Pin Campaign to Storefront Header Navbar"
+                                >
+                                    <Pin class="w-4 h-4" />
+                                </button>
                                 <button
                                     @click="openEditModal(sale)"
                                     class="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
@@ -503,9 +651,16 @@ function deleteSale(sale) {
                             >
                                 <div class="flex items-center gap-2.5 min-w-0">
                                     <img
-                                        :src="item.product?.primary_image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&auto=format&fit=crop&q=60'"
+                                        v-if="item.product?.primary_image"
+                                        :src="item.product.primary_image"
                                         class="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100"
                                     />
+                                    <div
+                                        v-else
+                                        class="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400"
+                                    >
+                                        <Package class="w-4 h-4" />
+                                    </div>
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-slate-900 dark:text-white truncate">{{ item.product?.name }}</p>
                                         <div class="flex items-center gap-1.5 mt-0.5">
@@ -524,6 +679,144 @@ function deleteSale(sale) {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= STOREFRONT HEADER NAVBAR MANAGER TAB ================= -->
+        <div v-else-if="activeTab === 'navbar'" class="space-y-6">
+                <!-- Header Card & Actions -->
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <Compass class="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 class="text-base font-black text-slate-900 dark:text-white">Storefront Header Navigation Bar</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Configure promotional links and campaign shortcuts displayed across the top navbar</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                @click="addNavItem('New Link', '/new-in', false)"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-xs cursor-pointer transition-all"
+                            >
+                                <Plus class="w-4 h-4" />
+                                <span>Add Navbar Link</span>
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="isSavingNav"
+                                @click="saveNavigationMenu"
+                                class="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-60"
+                            >
+                                <Loader2 v-if="isSavingNav" class="w-4 h-4 animate-spin" />
+                                <Save v-else class="w-4 h-4" />
+                                <span>Save Changes</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Nav Items Reorderable List -->
+                    <div class="space-y-3">
+                        <div
+                            v-for="(item, index) in navigationItems"
+                            :key="index"
+                            class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col md:flex-row items-stretch md:items-center gap-4 transition-all"
+                        >
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="w-6 h-6 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold flex items-center justify-center text-slate-500">
+                                    {{ index + 1 }}
+                                </span>
+                                <div class="flex flex-col gap-0.5">
+                                    <button
+                                        type="button"
+                                        :disabled="index === 0"
+                                        @click="moveNavItemUp(index)"
+                                        class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-25 disabled:hover:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                    >
+                                        <ArrowUp class="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        :disabled="index === navigationItems.length - 1"
+                                        @click="moveNavItemDown(index)"
+                                        class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-25 disabled:hover:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                    >
+                                        <ArrowDown class="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Label Input -->
+                            <div class="flex-1">
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Link Title / Label</label>
+                                <input
+                                    v-model="item.label"
+                                    type="text"
+                                    placeholder="e.g. PUJA-2026 or Budget Picks"
+                                    class="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-semibold focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <!-- URL / Route Input -->
+                            <div class="flex-1">
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Target URL / Route</label>
+                                <input
+                                    v-model="item.href"
+                                    type="text"
+                                    placeholder="e.g. /festival-26 or /best-deals"
+                                    class="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            <!-- Highlight / Sale Pill Toggle -->
+                            <div class="shrink-0 flex items-center gap-2 pt-2 md:pt-4">
+                                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                    <input
+                                        v-model="item.highlight"
+                                        type="checkbox"
+                                        class="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-600"
+                                    />
+                                    <span>Highlight (Blue Underline)</span>
+                                </label>
+                            </div>
+
+                            <!-- Remove Action -->
+                            <div class="shrink-0 flex items-center justify-end pt-2 md:pt-4">
+                                <button
+                                    type="button"
+                                    @click="removeNavItem(index)"
+                                    class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
+                                    title="Remove link"
+                                >
+                                    <Trash2 class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/40 rounded-2xl text-xs text-slate-500 dark:text-slate-400">
+                        💡 Category links (<em>Men, Women, Kids, Winter Wear</em>) automatically follow these links and are managed dynamically from your <a :href="route('admin.categories.index')" class="text-indigo-600 dark:text-indigo-400 font-bold underline">Categories Manager</a>.
+                    </div>
+
+                    <!-- Bottom Save Bar -->
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <p class="text-xs text-slate-400">Updates apply to the storefront navbar immediately.</p>
+                        <button
+                            type="button"
+                            :disabled="isSavingNav"
+                            @click="saveNavigationMenu"
+                            class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-60"
+                        >
+                            <Loader2 v-if="isSavingNav" class="w-4 h-4 animate-spin" />
+                            <Save v-else class="w-4 h-4" />
+                            <span>Save Header Links</span>
+                        </button>
                     </div>
                 </div>
             </div>

@@ -83,7 +83,11 @@ class ProductController extends Controller
 
         return Inertia::render('Admin/Products/Index', [
             'products' => $products,
-            'categories' => Category::where('is_active', true)->get(['id', 'name']),
+            'categories' => Category::where('is_active', true)
+                ->with('parent:id,name')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'parent_id', 'slug']),
             'brands' => Brand::where('is_active', true)->get(['id', 'name']),
             'filters' => $request->only(['search', 'product_type', 'category', 'status', 'low_stock', 'sort', 'direction']),
         ]);
