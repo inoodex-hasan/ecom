@@ -138,14 +138,6 @@ function getCustomerBadge(st) {
                         <Download class="w-3.5 h-3.5" />
                         <span>Excel</span>
                     </a>
-                    <a
-                        :href="route('admin.customers.export', { format: 'csv', search: search || undefined, status: status || undefined })"
-                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs transition-colors shrink-0"
-                        title="Export Customers as CSV"
-                    >
-                        <Download class="w-3.5 h-3.5" />
-                        <span>CSV</span>
-                    </a>
                 </div>
             </div>
 

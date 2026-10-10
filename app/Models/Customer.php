@@ -58,6 +58,11 @@ class Customer extends Model
         return $this->hasMany(Order::class)->latest();
     }
 
+    public function wishlists(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
     public function recalculateTotals(): void
     {
         $paidTotal = (float) $this->orders()->where('payment_status', 'paid')->sum('total');

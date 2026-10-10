@@ -135,7 +135,7 @@ const navGroups = [
 function hasPermission(permission) {
     if (!permission) return true;
     const user = page.props.auth?.user;
-    if (!user) return false;
+    if (!user) return true;
     if (user.is_super_admin || (Array.isArray(user.roles) && user.roles.includes('Super Admin'))) {
         return true;
     }
@@ -394,18 +394,18 @@ function logout() {
                         </div>
 
                         <!-- User Profile Dropdown -->
-                        <div class="relative" v-if="page.props.auth?.user">
+                        <div class="relative">
                             <button
                                 @click="isUserDropdownOpen = !isUserDropdownOpen"
                                 class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             >
                                 <img
-                                    :src="page.props.auth.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.props.auth.user.name)}&background=6366f1&color=fff`"
+                                    :src="page.props.auth?.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(page.props.auth?.user?.name || 'Admin')}&background=6366f1&color=fff`"
                                     alt="Avatar"
                                     class="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/20"
                                 />
                                 <span class="hidden md:inline-block text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ page.props.auth.user.name }}
+                                    {{ page.props.auth?.user?.name || 'Administrator' }}
                                 </span>
                                 <ChevronDown class="w-4 h-4 text-slate-400" />
                             </button>

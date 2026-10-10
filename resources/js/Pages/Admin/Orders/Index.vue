@@ -27,6 +27,8 @@ const props = defineProps({
     orders: Object,
     statusCounts: Object,
     filters: Object,
+    hasCourierApi: Boolean,
+    hasFraudApi: Boolean,
 });
 
 const search = ref(props.filters?.search || '');
@@ -339,6 +341,7 @@ function getPaymentBadge(status) {
                                 <th class="px-6 py-4">Customer</th>
                                 <th class="px-6 py-4">Payment</th>
                                 <th class="px-6 py-4">Fulfillment Status</th>
+                                <th class="px-6 py-4">Courier</th>
                                 <th class="px-6 py-4">BD Fraud Shield</th>
                                 <th class="px-6 py-4">Total</th>
                                 <th class="px-6 py-4 text-right">Actions</th>
@@ -356,13 +359,6 @@ function getPaymentBadge(status) {
                                         {{ order.order_number }}
                                     </Link>
                                     <span class="block text-[11px] text-slate-400 mt-0.5">{{ order.items_count }} items</span>
-
-                                    <div v-if="order.courier_consignment_id" class="mt-1">
-                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                            <Truck class="w-3 h-3 text-indigo-500" />
-                                            {{ order.courier_provider === 'pathao' ? 'PTH' : 'STF' }}: {{ order.courier_tracking_code || order.courier_consignment_id }}
-                                        </span>
-                                    </div>
                                 </td>
 
                                 <!-- Date -->
@@ -479,9 +475,22 @@ function getPaymentBadge(status) {
                                     </div>
                                 </td>
 
+                                <!-- Courier Column -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div v-if="hasCourierApi && order.courier_consignment_id">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                            <Truck class="w-3 h-3 text-indigo-500" />
+                                            {{ order.courier_provider === 'pathao' ? 'PTH' : 'STF' }}: {{ order.courier_tracking_code || order.courier_consignment_id }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60" title="Courier API not configured">
+                                        N/A
+                                    </span>
+                                </td>
+
                                 <!-- BD Fraud Shield Column -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex flex-col gap-1 items-start">
+                                    <div v-if="hasFraudApi" class="flex flex-col gap-1 items-start">
                                         <span
                                             v-if="order.fraud_risk_level === 'high'"
                                             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60"
@@ -518,6 +527,9 @@ function getPaymentBadge(status) {
                                             ৳{{ order.advance_delivery_charge }} Adv ({{ order.advance_payment_status }})
                                         </span>
                                     </div>
+                                    <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60" title="Fraud API not configured">
+                                        N/A
+                                    </span>
                                 </td>
 
                                 <!-- Total -->

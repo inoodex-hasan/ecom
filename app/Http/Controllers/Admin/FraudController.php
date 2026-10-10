@@ -86,14 +86,19 @@ class FraudController extends Controller
             'pathao_store_id' => (string) Setting::get('pathao_store_id', ''),
         ];
 
+        $hasCourierApi = ! empty(Setting::get('steadfast_api_key')) || ! empty(Setting::get('pathao_api_key'));
+        $hasFraudApi = ! empty(Setting::get('fraud_courier_api_key'));
+
         return Inertia::render('Admin/Fraud/Index', [
+            'hasCourierApi' => $hasCourierApi,
+            'hasFraudApi' => $hasFraudApi,
             'metrics' => [
-                'total_screened' => $totalScreened,
-                'high_risk' => $highRiskCount,
-                'medium_risk' => $mediumRiskCount,
-                'low_risk' => $lowRiskCount,
-                'blocked' => $blockedCount,
-                'estimated_saved_bdt' => $estimatedSavedBdt,
+                'total_screened' => $hasFraudApi ? $totalScreened : 'N/A',
+                'high_risk' => $hasFraudApi ? $highRiskCount : 'N/A',
+                'medium_risk' => $hasFraudApi ? $mediumRiskCount : 'N/A',
+                'low_risk' => $hasFraudApi ? $lowRiskCount : 'N/A',
+                'blocked' => $hasFraudApi ? $blockedCount : 'N/A',
+                'estimated_saved_bdt' => $hasFraudApi ? $estimatedSavedBdt : 'N/A',
                 'blacklist_count' => $blacklist->where('list_type', 'blacklist')->count(),
                 'whitelist_count' => $blacklist->where('list_type', 'whitelist')->count(),
             ],

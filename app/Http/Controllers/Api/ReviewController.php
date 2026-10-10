@@ -42,8 +42,8 @@ class ReviewController extends Controller
                 'current_page' => $reviews->currentPage(),
                 'last_page' => $reviews->lastPage(),
                 'total' => $reviews->total(),
-                'average_rating' => (float) $product->rating_cache,
-                'reviews_count' => (int) $product->reviews_count,
+                'average_rating' => (float) $product->rating_avg,
+                'reviews_count' => (int) $product->rating_count,
                 'distribution' => [
                     5 => $distribution[5] ?? 0,
                     4 => $distribution[4] ?? 0,
@@ -91,7 +91,7 @@ class ReviewController extends Controller
         ]);
 
         if ($status === 'approved') {
-            $product->updateRatingCache();
+            $product->updateRatingMetrics();
         }
 
         return response()->json([

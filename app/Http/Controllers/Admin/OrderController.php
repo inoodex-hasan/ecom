@@ -8,6 +8,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Setting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -71,10 +72,15 @@ class OrderController extends Controller
             'cancelled' => (int) ($rawCounts['cancelled'] ?? 0),
         ];
 
+        $hasCourierApi = ! empty(Setting::get('steadfast_api_key')) || ! empty(Setting::get('pathao_api_key'));
+        $hasFraudApi = ! empty(Setting::get('fraud_courier_api_key'));
+
         return Inertia::render('Admin/Orders/Index', [
             'orders' => $orders,
             'statusCounts' => $statusCounts,
             'filters' => $request->only(['search', 'status', 'payment_status', 'fraud_risk']),
+            'hasCourierApi' => $hasCourierApi,
+            'hasFraudApi' => $hasFraudApi,
         ]);
     }
 
@@ -82,8 +88,13 @@ class OrderController extends Controller
     {
         $order->load(['customer', 'items.product']);
 
+        $hasCourierApi = ! empty(Setting::get('steadfast_api_key')) || ! empty(Setting::get('pathao_api_key'));
+        $hasFraudApi = ! empty(Setting::get('fraud_courier_api_key'));
+
         return Inertia::render('Admin/Orders/Show', [
             'order' => $order,
+            'hasCourierApi' => $hasCourierApi,
+            'hasFraudApi' => $hasFraudApi,
         ]);
     }
 

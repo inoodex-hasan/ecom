@@ -46,6 +46,25 @@ class SettingController extends Controller
                     'key' => (string) $key,
                     'value' => is_array($value) ? json_encode($value) : (string) $value,
                 ];
+
+                // Sync dot-notation aliases for storefront compatibility
+                if ($key === 'store_address') {
+                    $upsertData[] = ['key' => 'contact.address', 'value' => (string) $value];
+                } elseif ($key === 'store_email') {
+                    $upsertData[] = ['key' => 'contact.email', 'value' => (string) $value];
+                } elseif ($key === 'store_phone') {
+                    $upsertData[] = ['key' => 'contact.phone', 'value' => (string) $value];
+                } elseif ($key === 'store_name') {
+                    $upsertData[] = ['key' => 'general.store_name', 'value' => (string) $value];
+                } elseif ($key === 'social_facebook') {
+                    $upsertData[] = ['key' => 'social.facebook', 'value' => (string) $value];
+                } elseif ($key === 'social_instagram') {
+                    $upsertData[] = ['key' => 'social.instagram', 'value' => (string) $value];
+                } elseif ($key === 'social_twitter') {
+                    $upsertData[] = ['key' => 'social.twitter', 'value' => (string) $value];
+                } elseif ($key === 'social_youtube') {
+                    $upsertData[] = ['key' => 'social.youtube', 'value' => (string) $value];
+                }
             }
             if (! empty($upsertData)) {
                 Setting::upsert($upsertData, ['key'], ['value']);

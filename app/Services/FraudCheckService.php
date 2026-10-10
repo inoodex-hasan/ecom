@@ -165,7 +165,7 @@ class FraudCheckService
         $apiKey = Setting::get('fraud_courier_api_key');
         $apiEndpoint = Setting::get('fraud_courier_api_endpoint');
 
-        if ($apiKey && $apiEndpoint) {
+        if (! empty($apiKey) && ! empty($apiEndpoint)) {
             try {
                 $response = Http::timeout(4)->withHeaders([
                     'Authorization' => "Bearer {$apiKey}",
@@ -180,6 +180,7 @@ class FraudCheckService
                     $rate = $total > 0 ? round(($delivered / $total) * 100, 1) : 100;
 
                     return [
+                        'has_api' => true,
                         'total_parcels' => $total,
                         'delivered' => $delivered,
                         'returned' => $returned,
@@ -193,35 +194,15 @@ class FraudCheckService
             }
         }
 
-        // 3. Fallback / Combined Internal & Network intelligence
-        if ($internalTotal > 0) {
-            $rate = round(($internalDelivered / $internalTotal) * 100, 1);
-
-            return [
-                'total_parcels' => $internalTotal,
-                'delivered' => $internalDelivered,
-                'returned' => $internalReturned,
-                'success_rate' => $rate,
-                'rto_risk' => $internalReturned > 1 ? 'critical' : ($internalReturned === 1 ? 'moderate' : 'low'),
-                'source' => 'Store Historical Orders',
-            ];
-        }
-
-        // Deterministic simulation based on number hash for demonstration when no orders exist yet
-        $hashVal = crc32($normalized);
-        $simTotal = ($hashVal % 12) + 1; // 1 to 13 parcels
-        $isHighRiskNumber = ($hashVal % 7 === 0); // ~14% of random numbers have high return rate for testing
-        $simReturned = $isHighRiskNumber ? (int) ceil($simTotal * 0.6) : (int) floor($simTotal * 0.1);
-        $simDelivered = max(0, $simTotal - $simReturned);
-        $simRate = round(($simDelivered / $simTotal) * 100, 1);
-
+        // When real courier API is not configured, return N/A
         return [
-            'total_parcels' => $simTotal,
-            'delivered' => $simDelivered,
-            'returned' => $simReturned,
-            'success_rate' => $simRate,
-            'rto_risk' => $simRate < 50 ? 'critical' : ($simRate < 75 ? 'high' : ($simRate < 90 ? 'moderate' : 'low')),
-            'source' => 'Courier Network Intelligence',
+            'has_api' => false,
+            'total_parcels' => 'N/A',
+            'delivered' => 'N/A',
+            'returned' => 'N/A',
+            'success_rate' => 'N/A',
+            'rto_risk' => 'N/A',
+            'source' => 'N/A (API Not Configured)',
         ];
     }
 

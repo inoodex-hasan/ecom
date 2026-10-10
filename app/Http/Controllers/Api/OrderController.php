@@ -67,14 +67,32 @@ class OrderController extends Controller
 
         // Map items.*.id -> items.*.product_id & items.*.qty -> items.*.quantity
         if (! empty($input['items']) && is_array($input['items'])) {
+            $defaultProduct = Product::where('status', 'published')->first();
             foreach ($input['items'] as $idx => $item) {
                 if (is_array($item)) {
-                    if (! empty($item['id']) && empty($item['product_id'])) {
-                        $numericId = preg_replace('/\D/', '', (string) $item['id']);
-                        $input['items'][$idx]['product_id'] = $numericId !== '' ? (int) $numericId : $item['id'];
+                    $prodId = $item['product_id'] ?? $item['id'] ?? null;
+                    $numericId = is_numeric($prodId) ? (int) $prodId : (int) preg_replace('/\D/', '', (string) $prodId);
+
+                    // Check if numeric product ID exists
+                    $exists = $numericId > 0 && Product::where('id', $numericId)->exists();
+                    if (! $exists && ! empty($item['name'])) {
+                        $matched = Product::where('name', 'like', '%'.$item['name'].'%')->first();
+                        if ($matched) {
+                            $numericId = $matched->id;
+                            $exists = true;
+                        }
                     }
+
+                    if (! $exists && $defaultProduct) {
+                        $numericId = $defaultProduct->id;
+                    }
+
+                    $input['items'][$idx]['product_id'] = $numericId;
                     if (! empty($item['qty']) && empty($item['quantity'])) {
                         $input['items'][$idx]['quantity'] = (int) $item['qty'];
+                    }
+                    if (empty($input['items'][$idx]['quantity'])) {
+                        $input['items'][$idx]['quantity'] = 1;
                     }
                 }
             }
@@ -244,7 +262,14 @@ class OrderController extends Controller
             $fraudStatus = $isBlacklisted ? 'suspect' : 'passed';
 
             // 7. Generate unique order number
-            $orderNumber = 'ORD-'.date('Ymd').'-'.strtoupper(Str::random(4));
+            $requestedOrderNumber = ! empty($request->input('order_number'))
+                ? strtoupper(trim($request->input('order_number')))
+                : null;
+            if ($requestedOrderNumber && ! Order::where('order_number', $requestedOrderNumber)->exists()) {
+                $orderNumber = $requestedOrderNumber;
+            } else {
+                $orderNumber = 'ORD-'.date('Ymd').'-'.strtoupper(Str::random(4));
+            }
 
             $shippingAddress = [
                 'name' => trim(($validated['first_name'] ?: 'Customer').' '.($validated['last_name'] ?? '')),
@@ -366,8 +391,10 @@ class OrderController extends Controller
      */
     public function track(Request $request, string $orderNumber): JsonResponse
     {
-        $order = Order::where('order_number', $orderNumber)
-            ->with(['items'])
+        $cleanNumber = strtoupper(trim($orderNumber));
+        $order = Order::where('order_number', $cleanNumber)
+            ->orWhere('order_number', trim($orderNumber))
+            ->with(['items', 'customer'])
             ->first();
 
         if (! $order) {
@@ -379,8 +406,14 @@ class OrderController extends Controller
 
         // Optional phone verification for security if phone parameter sent
         if ($request->filled('phone')) {
-            $shippingPhone = $order->shipping_address['phone'] ?? '';
-            if (substr(preg_replace('/\D/', '', $shippingPhone), -6) !== substr(preg_replace('/\D/', '', $request->query('phone')), -6)) {
+            $inputPhone = preg_replace('/\D/', '', (string) $request->query('phone'));
+            $shippingPhone = preg_replace('/\D/', '', (string) ($order->shipping_address['phone'] ?? ''));
+            $customerPhone = preg_replace('/\D/', '', (string) ($order->customer?->phone ?? ''));
+
+            $matchShipping = $shippingPhone !== '' && (substr($shippingPhone, -6) === substr($inputPhone, -6));
+            $matchCustomer = $customerPhone !== '' && (substr($customerPhone, -6) === substr($inputPhone, -6));
+
+            if (! $matchShipping && ! $matchCustomer) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Phone number does not match order record.',
@@ -394,19 +427,24 @@ class OrderController extends Controller
                 'order_number' => $order->order_number,
                 'status' => $order->status,
                 'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
                 'courier_provider' => $order->courier_provider,
                 'courier_tracking_code' => $order->courier_tracking_code,
-                'total' => $order->total,
-                'created_at' => $order->created_at,
-                'shipped_at' => $order->shipped_at,
-                'delivered_at' => $order->delivered_at,
+                'subtotal' => (float) $order->subtotal,
+                'discount' => (float) $order->discount,
+                'shipping_cost' => (float) $order->shipping_cost,
+                'total' => (float) $order->total,
+                'shipping_address' => $order->shipping_address,
+                'created_at' => $order->created_at?->toIso8601String(),
+                'shipped_at' => $order->shipped_at?->toIso8601String(),
+                'delivered_at' => $order->delivered_at?->toIso8601String(),
                 'items' => $order->items->map(fn ($item) => [
                     'product_name' => $item->product_name,
                     'sku' => $item->sku,
                     'image' => $item->image,
-                    'unit_price' => $item->unit_price,
-                    'quantity' => $item->quantity,
-                    'total' => $item->total,
+                    'unit_price' => (float) $item->unit_price,
+                    'quantity' => (int) $item->quantity,
+                    'total' => (float) $item->total,
                 ]),
             ],
         ]);

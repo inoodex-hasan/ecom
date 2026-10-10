@@ -32,6 +32,8 @@ import CustomSelect from '@/Components/CustomSelect.vue';
 
 const props = defineProps({
     order: Object,
+    hasCourierApi: Boolean,
+    hasFraudApi: Boolean,
 });
 
 const showAdvanceModal = ref(false);
@@ -514,6 +516,7 @@ function getStatusBadge(status) {
 
                     <!-- Score & Risk Badge -->
                     <div
+                        v-if="hasFraudApi"
                         class="flex items-center justify-between p-3.5 rounded-2xl"
                         :class="[
                             order.fraud_risk_level === 'high' ? 'bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40' :
@@ -550,6 +553,20 @@ function getStatusBadge(status) {
                         >
                             <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isProcessing }" />
                         </button>
+                    </div>
+                    <div
+                        v-else
+                        class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60"
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black text-sm">
+                                N/A
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-700 dark:text-slate-300">Fraud API Not Configured</p>
+                                <p class="text-[11px] text-slate-400">Risk scoring disabled until live API endpoints are set in Settings</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Phone Operator & Courier Intel (Side by Side Subgrid) -->
@@ -734,6 +751,11 @@ function getStatusBadge(status) {
 
                     <!-- State B: Not Yet Booked -> Dispatch Form -->
                     <div v-else class="space-y-3.5 text-xs">
+                        <div v-if="!hasCourierApi" class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2.5">
+                            <AlertTriangle class="w-4 h-4 shrink-0" />
+                            <span>Courier API is not configured (N/A). Live parcel booking is disabled until credentials are saved in Settings.</span>
+                        </div>
+
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Select Courier Network</label>
                             <div class="grid grid-cols-2 gap-2">

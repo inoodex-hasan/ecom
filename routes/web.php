@@ -167,6 +167,25 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Settings
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index')->middleware('can:settings.view');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.edit');
+
+    // Dedicated route for previewing / testing error pages inside admin
+    Route::get('/error/{status?}', function ($status = 404) {
+        $code = (int) $status;
+        $validCodes = [403, 404, 419, 500, 503];
+        $finalCode = in_array($code, $validCodes) ? $code : 404;
+
+        return Inertia::render('Error', [
+            'status' => $finalCode,
+        ])->toResponse(request())->setStatusCode($finalCode);
+    })->name('error.preview');
+
+    // Admin 404 Fallback within Admin Protected Area
+    Route::any('{any}', function () {
+        return Inertia::render('Error', [
+            'status' => 404,
+            'message' => 'The requested administrative page or resource could not be found.',
+        ])->toResponse(request())->setStatusCode(404);
+    })->where('any', '.*')->name('fallback');
 });
 
 Route::middleware('auth')->group(function () {
@@ -177,3 +196,11 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Global Web Fallback for unmatched routes
+Route::fallback(function () {
+    return Inertia::render('Error', [
+        'status' => 404,
+        'message' => 'The requested page could not be found.',
+    ])->toResponse(request())->setStatusCode(404);
+});

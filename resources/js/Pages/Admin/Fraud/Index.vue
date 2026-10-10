@@ -42,6 +42,8 @@ const props = defineProps({
     blacklist: Array,
     settings: Object,
     filters: Object,
+    hasCourierApi: Boolean,
+    hasFraudApi: Boolean,
 });
 
 const activeTab = ref('orders'); // 'orders' | 'checker' | 'blacklist' | 'settings'
@@ -213,6 +215,7 @@ function saveSettings() {
 
 // Helper formats
 const formatCurrency = (val) => {
+    if (val === 'N/A' || val === null || val === undefined) return 'N/A';
     return '৳' + Number(val || 0).toLocaleString('en-US');
 };
 
@@ -303,7 +306,16 @@ function getOperatorColor(operator) {
                 <div>
                     <div class="flex items-center gap-2.5">
                         <h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tight">Bangladeshi Fraud Shield & COD Defense</h1>
-                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <span
+                            v-if="!hasFraudApi && !hasCourierApi"
+                            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1"
+                        >
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> API Not Configured (N/A)
+                        </span>
+                        <span
+                            v-else
+                            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1"
+                        >
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Protection
                         </span>
                     </div>
@@ -317,15 +329,29 @@ function getOperatorColor(operator) {
         </template>
 
         <div class="space-y-6">
+            <!-- Warning Banner when API is not configured -->
+            <div
+                v-if="!hasFraudApi || !hasCourierApi"
+                class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-3"
+            >
+                <AlertTriangle class="w-5 h-5 text-amber-500 shrink-0" />
+                <div>
+                    <span class="font-bold">Notice:</span> External Fraud and Courier APIs are not yet configured. Real-time courier parcel intelligence and live risk scores will display <span class="font-mono font-bold bg-amber-500/20 px-1.5 py-0.5 rounded">N/A</span> until live API keys/endpoints are entered in <span class="font-semibold underline cursor-pointer" @click="activeTab = 'settings'">Shield Rules & Thresholds</span>.
+                </div>
+            </div>
+
             <!-- 1. Executive Bento Stats Deck -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <!-- Screened Orders -->
                 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex items-center justify-between">
                     <div>
                         <p class="text-xs font-medium text-slate-400">Total Screened Orders</p>
-                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ metrics.total_screened }}</h3>
+                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            {{ hasFraudApi ? metrics.total_screened : 'N/A' }}
+                        </h3>
                         <p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
-                            <CheckCircle2 class="w-3.5 h-3.5" /> {{ metrics.low_risk }} Clean & Auto-Approved
+                            <CheckCircle2 class="w-3.5 h-3.5" />
+                            {{ hasFraudApi ? `${metrics.low_risk} Clean & Auto-Approved` : 'N/A' }}
                         </p>
                     </div>
                     <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
@@ -337,9 +363,12 @@ function getOperatorColor(operator) {
                 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex items-center justify-between">
                     <div>
                         <p class="text-xs font-medium text-slate-400">High Risk & Flagged</p>
-                        <h3 class="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">{{ metrics.high_risk }}</h3>
+                        <h3 class="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                            {{ hasFraudApi ? metrics.high_risk : 'N/A' }}
+                        </h3>
                         <p class="text-[11px] text-amber-500 font-semibold mt-1 flex items-center gap-1">
-                            <AlertTriangle class="w-3.5 h-3.5" /> {{ metrics.medium_risk }} Under Phone Review
+                            <AlertTriangle class="w-3.5 h-3.5" />
+                            {{ hasFraudApi ? `${metrics.medium_risk} Under Phone Review` : 'N/A' }}
                         </p>
                     </div>
                     <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
@@ -351,9 +380,11 @@ function getOperatorColor(operator) {
                 <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex items-center justify-between">
                     <div>
                         <p class="text-xs font-medium text-slate-400">Courier Loss Prevented</p>
-                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ formatCurrency(metrics.estimated_saved_bdt) }}</h3>
+                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            {{ hasFraudApi && hasCourierApi ? formatCurrency(metrics.estimated_saved_bdt) : 'N/A' }}
+                        </h3>
                         <p class="text-[11px] text-slate-400 font-medium mt-1">
-                            Based on ৳120 return cost saved per blocked order
+                            {{ hasFraudApi && hasCourierApi ? 'Based on ৳120 return cost saved per blocked order' : 'Real-time calculation unavailable (N/A)' }}
                         </p>
                     </div>
                     <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -565,7 +596,7 @@ function getOperatorColor(operator) {
 
                                     <!-- Risk Score Meter -->
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="space-y-1">
+                                        <div v-if="hasFraudApi" class="space-y-1">
                                             <span
                                                 :class="[
                                                     getRiskBadge(order.fraud_risk_level, order.fraud_score).bg,
@@ -585,11 +616,14 @@ function getOperatorColor(operator) {
                                                 ></div>
                                             </div>
                                         </div>
+                                        <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                                            N/A
+                                        </span>
                                     </td>
 
                                     <!-- Primary Risk Flags Summary -->
                                     <td class="px-6 py-4 max-w-xs">
-                                        <div v-if="order.fraud_flags && order.fraud_flags.length" class="space-y-1">
+                                        <div v-if="hasFraudApi && order.fraud_flags && order.fraud_flags.length" class="space-y-1">
                                             <div
                                                 v-for="(flag, i) in order.fraud_flags.slice(0, 2)"
                                                 :key="i"
@@ -604,22 +638,28 @@ function getOperatorColor(operator) {
                                                 +{{ order.fraud_flags.length - 2 }} more flags
                                             </p>
                                         </div>
-                                        <span v-else class="text-[11px] text-slate-400">No flags</span>
+                                        <span v-else-if="hasFraudApi" class="text-[11px] text-slate-400">No flags</span>
+                                        <span v-else class="text-[11px] text-slate-400 font-mono">N/A</span>
                                     </td>
 
                                     <!-- Status Badge & Action -->
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                            :class="[
-                                                getStatusBadge(order.fraud_status).class,
-                                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border'
-                                            ]"
-                                        >
-                                            {{ getStatusBadge(order.fraud_status).label }}
+                                        <div v-if="hasFraudApi">
+                                            <span
+                                                :class="[
+                                                    getStatusBadge(order.fraud_status).class,
+                                                    'inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border'
+                                                ]"
+                                            >
+                                                {{ getStatusBadge(order.fraud_status).label }}
+                                            </span>
+                                            <p v-if="order.advance_delivery_charge" class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                                                Fee: ৳{{ order.advance_delivery_charge }} ({{ order.advance_payment_status }})
+                                            </p>
+                                        </div>
+                                        <span v-else class="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                                            N/A
                                         </span>
-                                        <p v-if="order.advance_delivery_charge" class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                                            Fee: ৳{{ order.advance_delivery_charge }} ({{ order.advance_payment_status }})
-                                        </p>
                                     </td>
 
                                     <!-- Actions -->
@@ -794,26 +834,28 @@ function getOperatorColor(operator) {
                         <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 text-center border border-slate-100 dark:border-slate-800">
                             <p class="text-[11px] text-slate-400 font-medium">Total Courier Parcels</p>
                             <h5 class="text-xl font-black text-slate-900 dark:text-white mt-1">
-                                {{ lookupResult.courier_history?.total_parcels || 0 }}
+                                {{ hasCourierApi && lookupResult.courier_history?.has_api ? (lookupResult.courier_history?.total_parcels || 0) : 'N/A' }}
                             </h5>
-                            <span class="text-[10px] text-slate-400">{{ lookupResult.courier_history?.source }}</span>
+                            <span class="text-[10px] text-slate-400">{{ hasCourierApi && lookupResult.courier_history?.has_api ? lookupResult.courier_history?.source : 'N/A (API Not Configured)' }}</span>
                         </div>
 
                         <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 text-center border border-slate-100 dark:border-slate-800">
                             <p class="text-[11px] text-slate-400 font-medium">Successful Deliveries</p>
                             <h5 class="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                                {{ lookupResult.courier_history?.delivered || 0 }}
+                                {{ hasCourierApi && lookupResult.courier_history?.has_api ? (lookupResult.courier_history?.delivered || 0) : 'N/A' }}
                             </h5>
-                            <span class="text-[10px] text-emerald-500 font-semibold">{{ lookupResult.courier_history?.success_rate }}% Success Rate</span>
+                            <span class="text-[10px] text-emerald-500 font-semibold">
+                                {{ hasCourierApi && lookupResult.courier_history?.has_api ? `${lookupResult.courier_history?.success_rate}% Success Rate` : 'N/A' }}
+                            </span>
                         </div>
 
                         <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 text-center border border-slate-100 dark:border-slate-800">
                             <p class="text-[11px] text-slate-400 font-medium">Returned / Cancelled (RTO)</p>
                             <h5 class="text-xl font-black text-rose-600 dark:text-rose-400 mt-1">
-                                {{ lookupResult.courier_history?.returned || 0 }}
+                                {{ hasCourierApi && lookupResult.courier_history?.has_api ? (lookupResult.courier_history?.returned || 0) : 'N/A' }}
                             </h5>
                             <span :class="[lookupResult.courier_history?.rto_risk === 'critical' ? 'text-rose-500' : 'text-amber-500', 'text-[10px] font-bold uppercase']">
-                                {{ lookupResult.courier_history?.rto_risk }} Risk
+                                {{ hasCourierApi && lookupResult.courier_history?.has_api ? `${lookupResult.courier_history?.rto_risk} Risk` : 'N/A' }}
                             </span>
                         </div>
                     </div>

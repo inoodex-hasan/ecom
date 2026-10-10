@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ContentController;
@@ -19,6 +20,21 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     // Health / Ping
     Route::get('/ping', fn () => response()->json(['status' => 'ok', 'app' => config('app.name'), 'time' => now()]));
+
+    // Customer Authentication & Member Area
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:30,1');
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:30,1');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::get('/auth/orders', [AuthController::class, 'orders']);
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        // Customer Cloud Wishlist
+        Route::get('/wishlist', [AuthController::class, 'getWishlist']);
+        Route::post('/wishlist/toggle', [AuthController::class, 'toggleWishlist']);
+        Route::post('/wishlist/sync', [AuthController::class, 'syncWishlist']);
+    });
 
     // Store Settings & Home Aggregate Feed
     Route::get('/settings', [InitController::class, 'settings']);
@@ -64,6 +80,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/campaigns', [CampaignController::class, 'index']);
 Route::post('/coupons/validate', [CouponController::class, 'validateCode']);
 Route::post('/orders', [OrderController::class, 'checkout']);
+Route::get('/orders/track/{orderNumber}', [OrderController::class, 'track']);
 Route::get('/pages/{slug}', [ContentController::class, 'page']);
 Route::get('/blogs', [ContentController::class, 'blogs']);
 Route::get('/blogs/{slug}', [ContentController::class, 'blogDetail']);

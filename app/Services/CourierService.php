@@ -152,28 +152,10 @@ class CourierService
             }
         }
 
-        // Demo / Fallback simulation when merchant has not yet inputted API credentials
-        $simConsignmentId = (string) (100000 + ($order->id * 142) + (crc32($order->order_number) % 8999));
-        $simTrackingCode = 'STF'.strtoupper(substr(md5($order->order_number.$order->id), 0, 8));
-
+        // Return error when merchant has not yet inputted API credentials
         return [
-            'success' => true,
-            'provider' => 'steadfast',
-            'consignment_id' => $simConsignmentId,
-            'tracking_code' => $simTrackingCode,
-            'status' => 'in_review',
-            'tracking_url' => "https://steadfast.com.bd/t/{$simTrackingCode}",
-            'is_simulated' => true,
-            'payload' => [
-                'invoice' => $order->order_number,
-                'recipient_name' => $name,
-                'recipient_phone' => $phone,
-                'recipient_address' => $address,
-                'cod_amount' => $cod,
-                'note' => $note,
-                'provider' => 'Steadfast Courier (Demonstration Mode)',
-            ],
-            'message' => 'Parcel booked with Steadfast Courier (Demo mode active until API key is set in Settings).',
+            'success' => false,
+            'message' => 'Steadfast Courier API credentials are not configured. Please set your API Key & Secret Key in Settings.',
         ];
     }
 
@@ -237,26 +219,10 @@ class CourierService
             }
         }
 
-        // Demo fallback simulation
-        $simConsignmentId = 'PTH'.strtoupper(substr(md5($order->order_number), 0, 9));
-
+        // Return error when merchant has not yet inputted API credentials
         return [
-            'success' => true,
-            'provider' => 'pathao',
-            'consignment_id' => $simConsignmentId,
-            'tracking_code' => $simConsignmentId,
-            'status' => 'pending',
-            'tracking_url' => "https://pathao.com/courier/tracking/?consignment_id={$simConsignmentId}",
-            'is_simulated' => true,
-            'payload' => [
-                'merchant_order_id' => $order->order_number,
-                'recipient_name' => $name,
-                'recipient_phone' => $phone,
-                'recipient_address' => $address,
-                'amount_to_collect' => $cod,
-                'provider' => 'Pathao Courier (Demonstration Mode)',
-            ],
-            'message' => 'Parcel booked with Pathao Courier (Demo mode active until credentials are configured).',
+            'success' => false,
+            'message' => 'Pathao Courier API credentials are not configured. Please set your credentials in Settings.',
         ];
     }
 

@@ -94,7 +94,7 @@ class ProductController extends Controller
         match ($sort) {
             'price_asc' => $query->orderBy('price', 'asc'),
             'price_desc' => $query->orderBy('price', 'desc'),
-            'rating' => $query->orderByDesc('rating_cache')->orderByDesc('reviews_count'),
+            'rating' => $query->orderByDesc('rating_avg')->orderByDesc('rating_count'),
             'name_asc' => $query->orderBy('name', 'asc'),
             default => $query->latest(),
         };
@@ -173,7 +173,7 @@ class ProductController extends Controller
             ->where('category_id', $product->category_id)
             ->where('id', '!=', $product->id)
             ->take(4)
-            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label']);
+            ->get(['id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label']);
 
         return response()->json([
             'success' => true,

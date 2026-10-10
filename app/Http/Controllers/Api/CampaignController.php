@@ -19,7 +19,7 @@ class CampaignController extends Controller
             ->where('ends_at', '>=', $now)
             ->orderBy('starts_at')
             ->with(['items.product' => function ($q) {
-                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label');
+                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label');
             }])
             ->get();
 
@@ -42,7 +42,7 @@ class CampaignController extends Controller
                 }
             })
             ->with(['items.product' => function ($q) {
-                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_cache', 'reviews_count', 'badge_label', 'stock_quantity');
+                $q->select('id', 'name', 'slug', 'price', 'compare_price', 'primary_image', 'rating_avg', 'rating_count', 'badge_label', 'stock_quantity');
             }])
             ->first();
 

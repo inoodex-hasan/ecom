@@ -17,7 +17,9 @@ import {
     Loader2,
     Sparkles,
     Compass,
-    Zap
+    Zap,
+    MapPin,
+    Share2
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -32,14 +34,19 @@ const faviconPreview = ref(props.settings?.store_favicon?.value || null);
 
 const form = useForm({
     settings: {
-        store_name: props.settings?.store_name?.value || 'ApexStore',
-        store_email: props.settings?.store_email?.value || 'support@apexstore.io',
-        store_phone: props.settings?.store_phone?.value || '+1 (555) 234-5678',
+        store_name: props.settings?.store_name?.value || props.settings?.['general.store_name']?.value || 'Loomora',
+        store_email: props.settings?.store_email?.value || props.settings?.['contact.email']?.value || 'support@loomora.com',
+        store_phone: props.settings?.store_phone?.value || props.settings?.['contact.phone']?.value || '+880-1700-000000',
+        store_address: props.settings?.store_address?.value || props.settings?.['contact.address']?.value || 'House 12, Road 5, Dhanmondi, Dhaka-1205, Bangladesh',
+        social_facebook: props.settings?.social_facebook?.value || props.settings?.['social.facebook']?.value || '',
+        social_instagram: props.settings?.social_instagram?.value || props.settings?.['social.instagram']?.value || '',
+        social_twitter: props.settings?.social_twitter?.value || props.settings?.['social.twitter']?.value || '',
+        social_youtube: props.settings?.social_youtube?.value || props.settings?.['social.youtube']?.value || '',
         currency_symbol: props.settings?.currency_symbol?.value || '৳',
         currency_code: props.settings?.currency_code?.value || 'BDT',
-        tax_rate_percentage: props.settings?.tax_rate_percentage?.value || '8.25',
-        flat_shipping_rate: props.settings?.flat_shipping_rate?.value || '12.50',
-        free_shipping_threshold: props.settings?.free_shipping_threshold?.value || '150.00',
+        tax_rate_percentage: props.settings?.tax_rate_percentage?.value || '0',
+        flat_shipping_rate: props.settings?.flat_shipping_rate?.value || props.settings?.['shipping.default_fee']?.value || '100.00',
+        free_shipping_threshold: props.settings?.free_shipping_threshold?.value || props.settings?.['shipping.free_shipping_threshold']?.value || '1000.00',
     },
     store_logo_file: null,
     store_favicon_file: null,
@@ -281,6 +288,19 @@ function submit() {
                                     class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
                                 />
                             </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                    <MapPin class="w-3.5 h-3.5 text-indigo-500" />
+                                    <span>Store Physical Address</span>
+                                </label>
+                                <textarea
+                                    v-model="form.settings.store_address"
+                                    rows="2"
+                                    placeholder="e.g. House 12, Road 5, Dhanmondi, Dhaka-1205, Bangladesh"
+                                    class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
+                                />
+                                <p class="text-[11px] text-slate-400 mt-1">Displayed dynamically in storefront footer, contact section, and invoices.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -369,6 +389,58 @@ function submit() {
                         <p class="text-[11px] text-slate-400 mt-1">Orders exceeding this amount receive free delivery.</p>
                     </div>
                 </div>
+
+            <!-- Social Media Channels (Full Width) -->
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
+                <div class="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <Share2 class="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white">Social Media & Community Links</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Configure profile URLs for footer and storefront social badges</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Facebook Page URL</label>
+                        <input
+                            v-model="form.settings.social_facebook"
+                            type="url"
+                            placeholder="https://facebook.com/loomora"
+                            class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Instagram Profile URL</label>
+                        <input
+                            v-model="form.settings.social_instagram"
+                            type="url"
+                            placeholder="https://instagram.com/loomora"
+                            class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">YouTube Channel URL</label>
+                        <input
+                            v-model="form.settings.social_youtube"
+                            type="url"
+                            placeholder="https://youtube.com/@loomora"
+                            class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">X (Twitter) URL</label>
+                        <input
+                            v-model="form.settings.social_twitter"
+                            type="url"
+                            placeholder="https://x.com/loomora"
+                            class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                    </div>
+                </div>
+            </div>
          </div>
 
             <!-- Save Action Bar -->
